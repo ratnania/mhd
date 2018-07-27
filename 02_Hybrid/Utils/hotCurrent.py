@@ -2,9 +2,10 @@
 
 import numpy as np
 
-def hotCurrent(particles_vel,particles_pos,particles_wk,nodes,basis,p):
+def hotCurrent(particles_vel,particles_pos,particles_wk,nodes,basis,p,qe):
     
     Nb = len(nodes) - 1
+    Np = len(particles_pos)
     
     jhx = np.zeros(Nb)
     jhy = np.zeros(Nb)
@@ -27,4 +28,4 @@ def hotCurrent(particles_vel,particles_pos,particles_wk,nodes,basis,p):
             jhy[i%Nb] += np.einsum('i,i,i',vy,wk,bi)
                       
 
-    return jhx,jhy
+    return qe*1/Np*jhx,qe*1/Np*jhy

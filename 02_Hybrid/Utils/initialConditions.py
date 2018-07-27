@@ -4,7 +4,7 @@ import numpy as np
 
 def IC(z,ini,amp,k,omega):
     
-    if ini == 'R-wave':
+    if ini == 1:
         
         Ex0 = +amp*np.cos(k*z)
         Ey0 = -amp*np.sin(k*z)
@@ -19,7 +19,7 @@ def IC(z,ini,amp,k,omega):
             
         return np.array([Ex0,Ey0,Bx0,By0,jx0,jy0])
     
-    elif ini == 'R-wave_h':
+    elif ini == 2:
         
         Ex0 = +amp*np.real(np.exp(1j*k*z))
         Ey0 = -amp*np.imag(np.exp(1j*k*z))
@@ -34,7 +34,7 @@ def IC(z,ini,amp,k,omega):
             
         return np.array([Ex0,Ey0,Bx0,By0,Bz0,jx0,jy0])
     
-    elif ini == 'sin-Bx':
+    elif ini == 3:
         
         Ex0 = 0*z
         Ey0 = 0*z
@@ -48,7 +48,7 @@ def IC(z,ini,amp,k,omega):
             
         return np.array([Ex0,Ey0,Bx0,By0,jx0,jy0])
     
-    elif ini == 'random_B':
+    elif ini == 4:
         
         Ex0 = 0*z
         Ey0 = 0*z
@@ -62,7 +62,7 @@ def IC(z,ini,amp,k,omega):
         return np.array([Ex0,Ey0,Bx0,By0,jx0,jy0])
       
     
-    elif ini == 'random_all':
+    elif ini == 5:
         
         Ex0 = amp*np.random.randn()
         Ey0 = amp*np.random.randn()
@@ -75,7 +75,7 @@ def IC(z,ini,amp,k,omega):
         
         return np.array([Ex0,Ey0,Bx0,By0,jx0,jy0])
         
-    elif ini == 'zero_all':
+    elif ini == 6:
         
         Ex0 = 0*z
         Ey0 = 0*z

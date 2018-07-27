@@ -1,4 +1,4 @@
-# This function pushes particles in an electromagnetic field by a time step dt
+# This function pushes particles with charge qe and mass me in the electromagnetic fields E and B by a time step dt using the Boris algorithm.
 
 import numpy as np
 
