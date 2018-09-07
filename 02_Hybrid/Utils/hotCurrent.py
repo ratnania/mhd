@@ -7,8 +7,7 @@ def hotCurrent(particles_vel,particles_pos,particles_wk,nodes,basis,p,qe):
     Nb = len(nodes) - 1
     Np = len(particles_pos)
     
-    jhx = np.zeros(Nb)
-    jhy = np.zeros(Nb)
+    jh = np.zeros(2*Nb)
     
     Zbin = np.digitize(particles_pos,nodes) - 1
     
@@ -24,8 +23,8 @@ def hotCurrent(particles_vel,particles_pos,particles_wk,nodes,basis,p,qe):
             i = il + ie
             bi = basis(particles_pos[indices],i)         
          
-            jhx[i%Nb] += np.einsum('i,i,i',vx,wk,bi)
-            jhy[i%Nb] += np.einsum('i,i,i',vy,wk,bi)
-                      
+            
+            jh[2*(i%Nb)] += np.einsum('i,i,i',vx,wk,bi) 
+            jh[2*(i%Nb)+1] += np.einsum('i,i,i',vy,wk,bi)         
 
-    return qe*1/Np*jhx,qe*1/Np*jhy
+    return qe*1/Np*jh
