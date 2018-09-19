@@ -5,7 +5,11 @@ import numpy as np
 def IC(z,ini,amp,k,omega):
     
     if ini == 1:
-        
+ 
+        eps0 = 1.0
+        wce = -1.0
+        wpe = 2.0
+
         Ex0 = +amp*np.cos(k*z)
         Ey0 = -amp*np.sin(k*z)
         
