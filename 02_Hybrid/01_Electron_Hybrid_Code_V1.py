@@ -149,7 +149,7 @@ from Utils.matrixAssembly import matrixAssembly
 
 
 restart = 0                        # ... start the simulation from the beginning (0) or continue (1)
-title = 'Results/simulation_data_T=60.txt'   # ... directory for saving data
+title = 'Results/02_ZeroIC/simulation_data_T=1500_L=327.7.txt'   # ... directory for saving data
 
 
 # ... physical parameters
@@ -160,11 +160,11 @@ qe = -1.0                          # ... electron charge
 me = 1.0                           # ... electron mass
 B0z = 1.0                          # ... background magnetic field in z-direction
 wce = qe*B0z/me                    # ... electron cyclotron frequency
-wpe = 2*np.abs(wce)                # ... cold electron plasma frequency
-nuh = 6e-2                         # ... ratio of cold/hot electron densities (nh/nc)
+wpe = 5*np.abs(wce)                # ... cold electron plasma frequency
+nuh = 6e-3                         # ... ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # ... hot electron density
 wpar = 0.2*c                       # ... parallel thermal velocity of energetic particles
-wperp = 0.63*c                     # ... perpendicular thermal velocity of energetic particles
+wperp = 0.53*c                     # ... perpendicular thermal velocity of energetic particles
 # ...
 
 
@@ -172,7 +172,7 @@ wperp = 0.63*c                     # ... perpendicular thermal velocity of energ
 
 # ... parameters for initial conditions
 k = 2                              # ... wavenumber of initial wave fields
-ini = 3                            # ... initial conditions for wave fields
+ini = 6                            # ... initial conditions for wave fields
 amp = 1e-4                         # ... amplitude of initial wave fields
 eps = 0.0                          # ... amplitude of spatial pertubation of distribution function 
 # ...
@@ -180,9 +180,9 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 
 # ... numerical parameters
-Lz = 2*np.pi/k                     # ... length of z-domain
-Nz = 200                           # ... number of elements z-direction
-T = 60.0                           # ... simulation time
+Lz = 327.7                         # ... length of z-domain
+Nz = 512                           # ... number of elements z-direction
+T = 1500.0                         # ... simulation time
 dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 8                             # ... length of v-domain in each direction (vx,vy,vz)
