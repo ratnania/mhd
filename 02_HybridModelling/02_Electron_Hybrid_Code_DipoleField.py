@@ -1,139 +1,4 @@
-
-# coding: utf-8
-
-# # Electron hybrid code for R/L-waves with stationary ions
-# 
-# ## 1. The model
-# The electron hybrid model for cold fluid electrons and hot kinetic electrons reads
-# 
-# \begin{align}
-# \frac{\partial \textbf{j}_\text{c}}{\partial t} = \epsilon_0\Omega_{\text{pe}}^2\textbf{E} + \Omega_\text{ce}\textbf{j}_\text{c}\times\textbf{e}_z,  \\
-# \frac{1}{c^2}\frac{\partial \textbf{E}}{\partial t} = \nabla\times\textbf{B} - \mu_0(\textbf{j}_\text{c} + \textbf{j}_\text{h}), \\
-# \frac{\partial \textbf{B}}{\partial t}=-\nabla\times\textbf{E}, \\
-# \frac{\partial f_\text{h}}{\partial t} + \textbf{v}\cdot\nabla f_\text{h} + \frac{q}{m}(\textbf{E}+\textbf{v}\times\textbf{B})\cdot\nabla_v f_\text{h}=0, \\
-# \textbf{j}_\text{h} = q\int\text{d}^3\textbf{v}\,\textbf{v}f_\text{h}.
-# \end{align}
-# 
-# where $\Omega_\text{ce}=\frac{q B_0}{m}$ is the signed cyclotron frequency and $\Omega_{\text{pe}}^2=\frac{n_\text{c}e^2}{\epsilon_0 m}$ the plasma frequency of the cold electrons. Here, only wave propagation parallel to the background magnetic field $\textbf{B}_0=B_0\textbf{e}_z$ is considered, i.e. $\textbf{k}=k\textbf{e}_z$. Therefore the nabla operator is simply $\nabla=\textbf{e}_z\partial_z$.
-# 
-# The first three equations are written in the compact form 
-# 
-# \begin{align}
-# \partial_t \textbf{U}+A_1\partial_z \textbf{U}+A_2\textbf{U}=\textbf{F},
-# \end{align}
-# 
-# for the electromagnetic fields $\textbf{E},\textbf{B}$ and the cold current density $\textbf{j}_\text{c}$, i.e. $\textbf{U}=(E_x,E_y,B_x,B_y,j_{\text{c}x},j_{\text{c}y})$. The z-components do not appear because they correspond to electrostatic waves which are not considered in this work. The matrices are
-# 
-# \begin{align}
-# A_1=
-# \begin{pmatrix}
-# 0 &0  &0 &c^2  &0 &0 \\
-# 0 &0  &-c^2 &0 &0 &0 \\
-# 0 &-1  &0 &0 &0 &0  \\
-# 1 &0  &0 &0 &0 &0  \\
-# 0 &0  &0 &0 &0 &0   \\
-# 0 &0  &0 &0 &0 &0 
-# \end{pmatrix}
-# \end{align}
-# 
-# and 
-# 
-# \begin{align}
-# A_2=
-# \begin{pmatrix}
-# 0 &0 &0 &0 &\mu_0c^2 &0 \\
-# 0 &0 &0 &0 &0 &\mu_0c^2 \\
-# 0 &0 &0 &0 &0 &0 \\
-# 0 &0 &0 &0 &0 &0 \\
-# -\epsilon_0\Omega_{\text{pe}}^2 &0 &0 &0 &0 &-\Omega_{\text{ce}} \\
-# 0 &-\epsilon_0\Omega_{\text{pe}}^2 &0 &0 &\Omega_{\text{ce}} &0 \\
-# \end{pmatrix}
-# \end{align}
-# 
-# with $\Omega_{\text{ce}}=-\frac{eB_0}{m}<0$ for electrons. The inhomogeneity is 
-# 
-# \begin{align}
-# \textbf{F}=
-# \begin{pmatrix}
-# -\mu_0c^2 j_{\text{h}x} \\
-# -\mu_0c^2 j_{\text{h}y} \\
-# 0 \\
-# 0 \\
-# 0 \\
-# 0
-# \end{pmatrix}.
-# \end{align}
-# 
-# 
-# ## 2. Dispersion relation
-# Linear theory of the above model leads to the following general dispersion relation for an arbitrary equilibrium distribution function $f^0=f^0(v_\parallel,v_\bot)$:
-# 
-# 
-# \begin{align}
-# D_{\text{R/L}}(k,\omega)=1-\frac{c^2k^2}{\omega^2}-\frac{\Omega_{\text{pe}}^2}{\omega(\omega\pm\Omega_{\text{ce}})}+\nu_\text{h}\frac{\Omega_{\text{pe}}^2}{\omega}\int\text{d}^3\textbf{v}\frac{v_\bot}{2}\frac{\hat{G}f_\text{h}^0}{\omega\pm\Omega_{\text{ce}}-kv_\parallel}=0.
-# \end{align}
-# 
-# Here $\nu_\text{h}=n_\text{h}/n_\text{c}\ll1$ is the ratio between the hot and cold electron number densities, respectively, $\text{d}^3\textbf{v}=\text{d}v_\parallel\text{d}v_\bot v_\bot 2\pi$ and the differential operator
-# 
-# \begin{align}
-# \hat{G}=\frac{\partial}{\partial v_\bot}+\frac{k}{\omega}\left(v_\bot\frac{\partial}{\partial v_\parallel}-v_\parallel\frac{\partial}{\partial v_\bot}\right).
-# \end{align}
-# 
-# For an anisotropic Maxwellian 
-# 
-# \begin{align}
-# f^0(v_\parallel,v_\bot) = \frac{1}{(2\pi)^{3/2}w_\parallel w_\bot^2}\exp\left(-\frac{v_\parallel^2}{2w_\parallel^2}-\frac{v_\bot^2}{2w_\bot^2}\right)
-# \end{align}
-# 
-# the dispersion relation is given by
-# 
-# \begin{align}
-# D_{\text{R/L}}(k,\omega)=D_{\text{cold,R/L}}(k,\omega)+\nu_\text{h}\frac{\Omega_{\text{pe}}^2}{\omega^2}\left[\frac{\omega}{k\sqrt{2}w_\parallel}Z(\xi^{\pm})-\left(1-\frac{w_\bot^2}{w_\parallel^2}\right)(1+\xi^{\pm} Z(\xi^{\pm}))\right]=0, 
-# \end{align}
-# 
-# where $Z$ is the plasma dispersion function and 
-# 
-# \begin{align}
-# \xi^{\pm} = \frac{\omega\pm\Omega_\text{ce}}{k\sqrt{2}w_\parallel}.
-# \end{align}
-# 
-# ## 3. Discretization
-# For the fields, B-spline Finite Elements are used together with a Crank-Nicolson time discretization which leads to the following matrix formulation:
-# 
-# \begin{align}
-# \left[M+\frac{1}{2}\Delta tCA_1+\frac{1}{2}\Delta tMA_2\right]\textbf{U}^{n+1}=\left[M-\frac{1}{2}\Delta tCA_1-\frac{1}{2}\Delta tMA_2\right]\textbf{U}^{n} + \Delta t \tilde{\textbf{F}}^{n+1/2},
-# \end{align}
-# 
-# with the mass and convection matrices
-# 
-# \begin{align}
-# M_{ij}=\int\varphi_i\varphi_j\,\text{d}z, \\
-# C_{ij}=\int\varphi_i\varphi_j^\prime\,\text{d}z
-# \end{align}
-# 
-# The hot current density is obtained using PIC techniques, i.e. the distribution function reads
-# 
-# \begin{align}
-# f_\text{h}(z,\textbf{v},t) \approx \frac{1}{N_k}\sum_k w_k\delta(z-z_k(t))\delta(\textbf{v}-\textbf{v}_k(t))
-# \end{align},
-# 
-# with the orbit equations
-# 
-# \begin{align}
-# \frac{\text{d}z_k}{dt}=v_{kz}, \\
-# \frac{\text{d}\textbf{v}_k}{dt}=\frac{q}{m}(\textbf{E}_k+\textbf{v}_k\times\textbf{B}_k).
-# \end{align}
-# With the definition of $f_\text{h}$ the inhomogeneity $\tilde{\textbf{F}}^{n+1/2}$ is
-# 
-# \begin{align}
-# \tilde{F}^{n+1/2}_i = -c^2\mu_0q\frac{1}{N_k}\sum_k w_k\textbf{v}_k^{n+1/2}\varphi_i(z_k^{n+1/2}).
-# \end{align}
-
-# In[1]:
-
-
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 from copy import deepcopy
 from scipy.linalg import block_diag
@@ -142,7 +7,7 @@ import Utilitis_HybridCode as utils
 
 
 restart = 0                        # ... start the simulation from the beginning (0) or continue (1)                                
-title = 'Results/DF_Run1_T=5000_L=327.7_xi=8.62e-5.txt' # ... directory for saving data
+title = 'DF_TestRun_T=5000_L=327.7_N=600_xi=8.62e-5.txt' # ... directory for saving data
 
 
 # ... physical parameters
@@ -180,9 +45,8 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 
 # ... numerical parameters
-#Lz = 327.7                         # ... total length of z-domain
-Lz = 2*np.pi/k
-Nel = 256                          # ... number of elements z-direction
+Lz = 327.7                         # ... total length of z-domain
+Nel = 600                          # ... number of elements z-direction
 T = 5000.0                         # ... simulation time
 dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
@@ -594,7 +458,7 @@ if restart == 0:
 
 
 
-    '''
+    
     # ... create data file and save parameters (first row) and initial fields (second row)
     file = open(title,'ab')
 
@@ -617,16 +481,17 @@ if restart == 0:
 
         particles[:, 0], particles[:, 1:4], particles[:, 4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:,2] = update(uj, particles, Ep, Bp, dt)
 
-        # ... add data to file
-        data = np.append(uj, jh)
-        data = np.append(data, tn[n + 1])
-        np.savetxt(file, np.reshape(data, (1,8*Nb + 1)), fmt = '%1.6e')
-        # ...
+        if n%10 == 0:
+            # ... add data to file
+            data = np.append(uj, jh)
+            data = np.append(data, tn[n + 1])
+            np.savetxt(file, np.reshape(data, (1,8*Nb + 1)), fmt = '%1.4e')
+            # ...
     # ...
     
 
     file.close()
-    '''
+    
   
     
 
@@ -651,11 +516,12 @@ if restart == 1:
 
         particles[:, 0], particles[:, 1:4], particles[:,4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:, 2] = update(uj, particles, Ep, Bp, dt)
 
-        # ... add data to file
-        data = np.append(uj, jh)
-        data = np.append(data, tn[i + 1])
-        np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.6e')
-        # ...
+        if i%10 == 0:
+            # ... add data to file
+            data = np.append(uj, jh)
+            data = np.append(data, tn[i + 1])
+            np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.6e')
+            # ...
     # ...
 
 
