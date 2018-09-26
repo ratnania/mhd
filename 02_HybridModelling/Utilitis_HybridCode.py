@@ -189,7 +189,7 @@ class Bspline(object):
         tck = (self.T, c, self.p)
         return splev(x, tck, der = n_deriv)
 
-    def greville(self):
+    def grevilleIga(self):
         """
         Returns the Greville points
         """
@@ -197,8 +197,23 @@ class Bspline(object):
         T = self.T
 
         # TODO implement a pure python function and not use igakit
-        from igakit import igalib
-        return igalib.bsp.Greville(p, T)
+        #from igakit import igalib
+        #return igalib.bsp.Greville(p, T)
+    
+    def greville(self):
+        """
+        Returns the Greville points
+        """
+        p = self.p
+        T = self.T
+        N = self.N
+
+        grev = np.zeros(N)
+        
+        for i in range(N):
+            grev[i] = 1/p*sum(T[i+1:p+i+1])
+            
+        return grev
 
     def plot(self, nx = 100):
         """
