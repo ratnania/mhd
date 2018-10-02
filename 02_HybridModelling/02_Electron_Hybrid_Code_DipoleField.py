@@ -7,7 +7,7 @@ import Utilitis_HybridCode as utils
 
 
 restart = 0                        # ... start the simulation from the beginning (0) or continue (1)                                
-title = 'DF_TestRun_T=5000_L=327.7_N=600_xi=8.62e-5.txt' # ... directory for saving data
+title = 'Results/03_DipoleField/simulation_data_T=3000_L=327.7_xi=8.62e-5_2.txt' # ... directory for saving data
 
 
 # ... physical parameters
@@ -37,7 +37,7 @@ bcs_g = 1                          # ... boundary condition for distribution fun
 
 # ... parameters for initial conditions
 k = 2                              # ... wavenumber of initial wave fields
-ini = 3                            # ... initial conditions for wave fields
+ini = 6                            # ... initial conditions for wave fields
 amp = 1e-4                         # ... amplitude of initial wave fields
 eps = 0.0                          # ... amplitude of spatial pertubation of distribution function 
 # ...
@@ -46,9 +46,9 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 # ... numerical parameters
 Lz = 327.7                         # ... total length of z-domain
-Nel = 600                          # ... number of elements z-direction
-T = 5000.0                         # ... simulation time
-dt = 0.05                          # ... time step
+Nel = 300                          # ... number of elements z-direction
+T = 3000.0                         # ... simulation time
+dt = 0.1                           # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 2                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
