@@ -7,7 +7,7 @@ import Utilitis_HybridCode as utils
 
 
 restart = 0                        # ... start the simulation from the beginning (0) or continue (1)                                
-title = 'Results/03_DipoleField/simulation_data_T=3000_L=327.7_xi=8.62e-5_2.txt' # ... directory for saving data
+title = 'Results/03_DipoleField/simulation_data_T=3000_L=327.7_xi=8.62e-5_noChorus.txt' # ... directory for saving data
 
 
 # ... physical parameters
@@ -22,7 +22,7 @@ wpe = 5*np.abs(wce)                # ... cold electron plasma frequency
 nuh = 6e-3                         # ... ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # ... hot electron density
 wpar = 0.2*c                       # ... parallel thermal velocity of energetic particles
-wperp = 0.53*c                     # ... perpendicular thermal velocity of energetic particles
+wperp = 0.47*c                     # ... perpendicular thermal velocity of energetic particles
 
 xi = 8.62e-5                       # ... inhomogeneity factor of background magnetic field
 
