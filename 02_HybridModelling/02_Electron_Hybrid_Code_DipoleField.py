@@ -502,7 +502,7 @@ if restart == 0:
 if restart == 1:
     
     # ... open data file that hasn't been finished yet
-    file = open('Results/simulation_data_T=20(test).txt', 'ab')
+    file = open(title, 'ab')
     # ...
 
 
@@ -520,7 +520,7 @@ if restart == 1:
             # ... add data to file
             data = np.append(uj, jh)
             data = np.append(data, tn[i + 1])
-            np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.6e')
+            np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.4e')
             # ...
     # ...
 

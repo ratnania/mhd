@@ -5,7 +5,7 @@ from scipy.interpolate import splev
 
 
 def borisPush(particles, dt, B, E, qe, me, Lz, bcs = 1):
-    '''Pushes particles by a time step dt in the electromagnetic fields E and B using the Boris method.
+    '''Pushes particles by a time step dt in the electromagnetic fields E and B by using the Boris method.
     
         Parameters:
             particles : ndarray
