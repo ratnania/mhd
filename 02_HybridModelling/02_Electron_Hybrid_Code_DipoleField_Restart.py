@@ -7,8 +7,8 @@ import Utilitis_HybridCode as utils
 
 
 restart = 0                        # ... start the simulation from the beginning (0) or continue (1)                                
-title = 'Results/02_DipoleField/simulation_data_dt=0.1_L=327.7_N=600_Np=2e6_xi=8.62e-5_RestartCode.txt' # ... directory for saving data
-saving_step = 5                    # ... save only the data of every saving_step-th time step
+title = 'Results/02_DipoleField/dt=0.1_L=160_N=400_Np=8e5_xi=4*8.62e-5_Ld=0.1.txt' # ... directory for saving data
+saving_step = 2                    # ... save only the data of every saving_step-th time step
 
 
 
@@ -24,9 +24,9 @@ wpe = 5*np.abs(wce)                # ... cold electron plasma frequency
 nuh = 6e-3                         # ... ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # ... hot electron density
 wpar = 0.2*c                       # ... parallel thermal velocity of energetic particles
-wperp = 0.53*c                     # ... perpendicular thermal velocity of energetic particles
+wperp = 0.63*c                     # ... perpendicular thermal velocity of energetic particles
 
-xi = 8.62e-5                       # ... inhomogeneity factor of background magnetic field
+xi = 4*8.62e-5                     # ... inhomogeneity factor of background magnetic field
 
 bcs_p = 2                          # ... particle boundary conditions (1: periodic, 2: reflecting)
 bcs_f = 2                          # ... boundary conditions for fields (1: periodic, 2: hom. Dirichlet)
@@ -47,16 +47,16 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 
 # ... numerical parameters
-Lz = 327.7                         # ... total length of z-domain
-Nel = 600                          # ... number of elements z-direction
+Lz = 160.0                         # ... total length of z-domain
+Nel = 400                          # ... number of elements z-direction
 T = 3000                           # ... simulation time
 dt = 0.1                           # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 2                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-Np = np.int(2e6)                   # ... number of energetic simulation particles 
+Np = np.int(8e5)                   # ... number of energetic simulation particles 
 
-Ld = 0.05*Lz                       # ... length of damping region at each end 
+Ld = 0.1*Lz                        # ... length of damping region at each end 
 # ...
 
 
@@ -166,12 +166,12 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... update weights with control variate
-    wnew = w0 - Maxwell(vnew[:,0], vnew[:,1], vnew[:,2])/g0
+    wnew = w0 - Maxwell(vnew[:, 0], vnew[:, 1], vnew[:, 2])/g0
     # ...
     
     
     # ... compute hot electron current densities
-    jhnew = utils.hotCurrent(vnew[:,0:2], 1/2*(znew + zold), wnew, zj, bsp, qe, c, bcs = bcs_f)
+    jhnew = utils.hotCurrent(vnew[:, 0:2], 1/2*(znew + zold), wnew, zj, bsp, qe, c, bcs = bcs_f)
     # ...
      
     
@@ -190,12 +190,12 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... compute fields at particle positions with new fields (wave + background)
-    Epnew_xy,Bpnew_xy = utils.fieldInterpolation(znew, zj, bsp, ujnew, bcs_f)
+    Epnew_xy, Bpnew_xy = utils.fieldInterpolation(znew, zj, bsp, ujnew, bcs_f)
     
     Bpnew_z = B_background_z(znew)
     rho = -me/qe*np.cross(vnew, np.array([0, 0, 1]))/Bpnew_z[:, None]
     
-    Bpnew_xy += B_background(rho[:,0], rho[:,1], znew)[:, 0:2]
+    Bpnew_xy += B_background(rho[:, 0], rho[:, 1], znew)[:, 0:2]
     # ...
     
     return znew, vnew, wnew, jhnew, ujnew, Epnew_xy, Bpnew_xy, Bpnew_z
@@ -237,8 +237,8 @@ if restart == 0:
         
         if z <= Ld:
             return np.sin(np.pi*z/(2*Ld))
-        elif z >= Lz-Ld:
-            return np.sin(np.pi*(Lz-z)/(2*Ld))
+        elif z >= Lz - Ld:
+            return np.sin(np.pi*(Lz - z)/(2*Ld))
         else:
             return 1.0
     # ...

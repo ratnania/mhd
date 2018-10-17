@@ -46,13 +46,13 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 # ... numerical parameters
 Lz = 327.7                         # ... total length of z-domain
-Nel = 300                          # ... number of elements z-direction
-T = 3000.0                         # ... simulation time
+Nel = 128                          # ... number of elements z-direction
+T = 50                             # ... simulation time
 dt = 0.1                           # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 2                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-Np = np.int(5e5)                   # ... number of energetic simulation particles 
+Np = np.int(1e5)                   # ... number of energetic simulation particles 
 
 Ld = 0.05*Lz                       # ... length of damping region at each end 
 # ...
@@ -526,4 +526,3 @@ if restart == 1:
 
 
     file.close() 
-
