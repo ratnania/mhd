@@ -6,8 +6,17 @@ import Utilitis_HybridCode as utils
 
 
 
-restart = 0                        # ... start the simulation from the beginning (0) or continue (1)                                
-title = 'Results/02_DipoleField/simulation_data_T=3000_L=327.7_xi=8.62e-5_test.txt' # ... directory for saving data
+# ... start the simulation from the beginning (0) or continue (1)  
+restart = 0    
+
+
+# ... directory for saving simulation data
+title = 'Results/02_DipoleField/dt=0.1_L=160_N=400_Np=8e5_xi=4*8.62e-5_Ld=0.1.txt' 
+
+
+# ... save only the data of every saving_step-th time step (reduces size of data file)
+saving_step = 2                    
+
 
 
 # ... physical parameters
@@ -22,9 +31,9 @@ wpe = 5*np.abs(wce)                # ... cold electron plasma frequency
 nuh = 6e-3                         # ... ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # ... hot electron density
 wpar = 0.2*c                       # ... parallel thermal velocity of energetic particles
-wperp = 0.53*c                     # ... perpendicular thermal velocity of energetic particles
+wperp = 0.63*c                     # ... perpendicular thermal velocity of energetic particles
 
-xi = 8.62e-5                       # ... inhomogeneity factor of background magnetic field
+xi = 4*8.62e-5                     # ... inhomogeneity factor of background magnetic field
 
 bcs_p = 2                          # ... particle boundary conditions (1: periodic, 2: reflecting)
 bcs_f = 2                          # ... boundary conditions for fields (1: periodic, 2: hom. Dirichlet)
@@ -45,16 +54,16 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 
 # ... numerical parameters
-Lz = 327.7                         # ... total length of z-domain
-Nel = 128                          # ... number of elements z-direction
-T = 50                             # ... simulation time
+Lz = 160.0                         # ... total length of z-domain
+Nel = 400                          # ... number of elements z-direction
+T = 3000                           # ... simulation time
 dt = 0.1                           # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 2                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-Np = np.int(1e5)                   # ... number of energetic simulation particles 
+Np = np.int(8e5)                   # ... number of energetic simulation particles 
 
-Ld = 0.05*Lz                       # ... length of damping region at each end 
+Ld = 0.1*Lz                        # ... length of damping region at each end 
 # ...
 
 
@@ -96,6 +105,7 @@ pa[26] = bcs_p
 pa[27] = bcs_f
 pa[28] = bcs_d
 pa[29] = bcs_g
+pa[30] = saving_step
 # ...
 
 
@@ -104,8 +114,6 @@ pa[29] = bcs_g
 dz = Lz/Nel
 zj = np.linspace(0, Lz, Nel + 1)
 
-Nt = np.int(T/dt)
-tn = np.linspace(0, T, Nt + 1)
 
 dv = Lv/Nv
 vj = np.linspace(-Lv/2, Lv/2, Nv + 1)
@@ -165,12 +173,12 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... update weights with control variate
-    wnew = w0 - Maxwell(vnew[:,0], vnew[:,1], vnew[:,2])/g0
+    wnew = w0 - Maxwell(vnew[:, 0], vnew[:, 1], vnew[:, 2])/g0
     # ...
     
     
     # ... compute hot electron current densities
-    jhnew = utils.hotCurrent(vnew[:,0:2], 1/2*(znew + zold), wnew, zj, bsp, qe, c, bcs = bcs_f)
+    jhnew = utils.hotCurrent(vnew[:, 0:2], 1/2*(znew + zold), wnew, zj, bsp, qe, c, bcs = bcs_f)
     # ...
      
     
@@ -189,12 +197,12 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... compute fields at particle positions with new fields (wave + background)
-    Epnew_xy,Bpnew_xy = utils.fieldInterpolation(znew, zj, bsp, ujnew, bcs_f)
+    Epnew_xy, Bpnew_xy = utils.fieldInterpolation(znew, zj, bsp, ujnew, bcs_f)
     
     Bpnew_z = B_background_z(znew)
     rho = -me/qe*np.cross(vnew, np.array([0, 0, 1]))/Bpnew_z[:, None]
     
-    Bpnew_xy += B_background(rho[:,0], rho[:,1], znew)[:, 0:2]
+    Bpnew_xy += B_background(rho[:, 0], rho[:, 1], znew)[:, 0:2]
     # ...
     
     return znew, vnew, wnew, jhnew, ujnew, Epnew_xy, Bpnew_xy, Bpnew_z
@@ -236,15 +244,15 @@ if restart == 0:
         
         if z <= Ld:
             return np.sin(np.pi*z/(2*Ld))
-        elif z >= Lz-Ld:
-            return np.sin(np.pi*(Lz-z)/(2*Ld))
+        elif z >= Lz - Ld:
+            return np.sin(np.pi*(Lz - z)/(2*Ld))
         else:
             return 1.0
     # ...
     
 
 
-    # ... create B-spline basis, quadrature grid and get Greville points
+    # ... create B-spline basis and quadrature grid
     bsp, Nbase, quad_points, weights = utils.createBasis(Lz, Nel, p, bcs_f)
     # ...
     
@@ -262,10 +270,10 @@ if restart == 0:
 
         # ... assemble block damping matrix
         timea = time.time()
-        DAMPblock = np.zeros((s*(Nbase - 2),s*(Nbase - 2)))
+        DAMPblock = np.zeros((s*(Nbase - 2), s*(Nbase - 2)))
 
         for i in range(0, s):
-            DAMPblock[i::s,i::s] = DAMP
+            DAMPblock[i::s, i::s] = DAMP
 
         timeb = time.time()
         print('time for block damping matrix assembly: ' + str(timeb - timea))
@@ -299,7 +307,7 @@ if restart == 0:
     # ... assemble mass, convection and background field matrices
     timea = time.time()
 
-    M,C,D = utils.matrixAssembly(bsp, weights, quad_points, B_background_z, bcs_f)
+    M, C, D = utils.matrixAssembly(bsp, weights, quad_points, B_background_z, bcs_f)
 
     timeb = time.time()
     print('time for matrix assembly: ' + str(timeb - timea))
@@ -357,11 +365,11 @@ if restart == 0:
             for j in range(s):
                 
                 if i == 4 and j == 5:
-                    Dblock[i::s, j::s] = A2[i,j]*D
+                    Dblock[i::s, j::s] = A2[i, j]*D
                 elif i == 5 and j == 4:
-                    Dblock[i::s, j::s] = A2[i,j]*D
+                    Dblock[i::s, j::s] = A2[i, j]*D
                 else:
-                    Dblock[i::s, j::s] = A2[i,j]*M
+                    Dblock[i::s, j::s] = A2[i, j]*M
             
                 
     elif bcs_f == 2:
@@ -373,13 +381,13 @@ if restart == 0:
             for j in range(s):
                     
                 if i == 4 and j == 5:
-                    Dblock[i::s, j::s] = A2[i, j]*D[1:Nbase - 1,1:Nbase - 1]
+                    Dblock[i::s, j::s] = A2[i, j]*D[1:Nbase - 1, 1:Nbase - 1]
                         
                 elif i == 5 and j == 4:
-                    Dblock[i::s, j::s] = A2[i, j]*D[1:Nbase - 1,1:Nbase - 1]
+                    Dblock[i::s, j::s] = A2[i, j]*D[1:Nbase - 1, 1:Nbase - 1]
                         
                 else:
-                    Dblock[i::s, j::s] = A2[i, j]*M[1:Nbase - 1,1:Nbase - 1]
+                    Dblock[i::s, j::s] = A2[i, j]*M[1:Nbase - 1, 1:Nbase - 1]
          
                 
     timeb = time.time()
@@ -390,7 +398,7 @@ if restart == 0:
 
 
 
-    # ... create particles (z,vx,vy,vz,wk) and sample positions and velocities according to sampling distribution
+    # ... create particles (z, vx, vy, vz, wk) and sample positions and velocities according to sampling distribution
     particles = np.zeros((Np, 5))
     particles[:, 0] = np.random.rand(Np)*Lz
     particles[:, 1] = np.random.randn(Np)*wperp
@@ -402,8 +410,8 @@ if restart == 0:
 
 
     # ... parameters for control variate
-    g0 = g_sampling(particles[:,1], particles[:,2], particles[:,3])
-    w0 = fh0(particles[:,0], particles[:,1], particles[:,2], particles[:,3])/g_sampling(particles[:,1], particles[:,2], particles[:,3])
+    g0 = g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
+    w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
     # ...
 
 
@@ -415,7 +423,7 @@ if restart == 0:
     
     timea = time.time()
     
-    Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:,0], zj, bsp, uj, bcs_f)
+    Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], zj, bsp, uj, bcs_f)
     
     
     Bp[:, 2] = B_background_z(particles[:, 0])
@@ -460,33 +468,48 @@ if restart == 0:
 
     
     # ... create data file and save parameters (first row) and initial fields (second row)
-    file = open(title,'ab')
+    file = open(title, 'ab')
 
 
-    np.savetxt(file, np.reshape(pa,(1,8*Nb + 1)), fmt = '%1.6e')
+    np.savetxt(file, np.reshape(pa,(1, 8*Nb + 1)), fmt = '%1.5e')
 
     data = np.append(uj, np.zeros(2*Nb))
-    data = np.append(data, tn[0])
-    np.savetxt(file, np.reshape(data, (1,8*Nb + 1)), fmt = '%1.6e')
+    data = np.append(data, 0)
+    np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.5e')
     # ...
 
 
     # ... time loop
-    print('total number of time steps: ' + str(Nt))
+    print('start time integration!')
+    time_step = 0
 
-    for n in range(0, Nt):
+    while True:
 
-        if n%50 == 0:
-            print('time steps finished: ' + str(n))
+        try:
+            if time_step%50 == 0:
+                print('time steps finished: ' + str(time_step))
 
-        particles[:, 0], particles[:, 1:4], particles[:, 4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:,2] = update(uj, particles, Ep, Bp, dt)
+            particles[:, 0], particles[:, 1:4], particles[:, 4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:, 2] = update(uj, particles, Ep, Bp, dt)
 
-        if n%10 == 0:
-            # ... add data to file
-            data = np.append(uj, jh)
-            data = np.append(data, tn[n + 1])
-            np.savetxt(file, np.reshape(data, (1,8*Nb + 1)), fmt = '%1.4e')
-            # ...
+            if time_step%saving_step == 0:
+                # ... add data to file
+                data = np.append(uj, jh)
+                data = np.append(data, (time_step + 1)*dt)
+                np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.4e')
+                # ...
+
+                
+            time_step += 1
+        except KeyboardInterrupt:
+            print('Pausing...  (Hit ENTER to continue, type quit to exit.)')
+            try:
+                response = input()
+                if response == 'quit':
+                    break
+                print('Resuming...')
+            except KeyboardInterrupt:
+                print('Resuming...')
+                continue
     # ...
     
 
@@ -514,7 +537,7 @@ if restart == 1:
         if i%50 == 0:
             print('time steps finished: ' + str(i))
 
-        particles[:, 0], particles[:, 1:4], particles[:,4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:, 2] = update(uj, particles, Ep, Bp, dt)
+        particles[:, 0], particles[:, 1:4], particles[:, 4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:, 2] = update(uj, particles, Ep, Bp, dt)
 
         if i%10 == 0:
             # ... add data to file
