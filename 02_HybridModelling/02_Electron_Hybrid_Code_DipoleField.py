@@ -11,7 +11,7 @@ restart = 0
 
 
 # ... directory for saving simulation data
-title = 'Results/02_DipoleField/dt=0.1_L=160_N=400_Np=8e5_xi=4*8.62e-5_Ld=0.1.txt' 
+title = 'Results/02_DipoleField/test.txt' 
 
 
 # ... save only the data of every saving_step-th time step (reduces size of data file)
@@ -31,9 +31,9 @@ wpe = 5*np.abs(wce)                # ... cold electron plasma frequency
 nuh = 6e-3                         # ... ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # ... hot electron density
 wpar = 0.2*c                       # ... parallel thermal velocity of energetic particles
-wperp = 0.63*c                     # ... perpendicular thermal velocity of energetic particles
+wperp = 0.53*c                     # ... perpendicular thermal velocity of energetic particles
 
-xi = 4*8.62e-5                     # ... inhomogeneity factor of background magnetic field
+xi = 8.62e-5                       # ... inhomogeneity factor of background magnetic field
 
 bcs_p = 2                          # ... particle boundary conditions (1: periodic, 2: reflecting)
 bcs_f = 2                          # ... boundary conditions for fields (1: periodic, 2: hom. Dirichlet)
@@ -54,7 +54,7 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 
 # ... numerical parameters
-Lz = 160.0                         # ... total length of z-domain
+Lz = 327.7                         # ... total length of z-domain
 Nel = 400                          # ... number of elements z-direction
 T = 3000                           # ... simulation time
 dt = 0.1                           # ... time step
@@ -70,9 +70,9 @@ Ld = 0.1*Lz                        # ... length of damping region at each end
 
 # ... create parameter list
 if bcs_f == 1:
-    pa = np.zeros(8*Nel + 1)
+    pa = np.zeros(1*Nel + 1)
 elif bcs_f == 2:
-    pa = np.zeros(8*(Nel + p - 2) + 1)
+    pa = np.zeros(1*(Nel + p - 2) + 1)
 
 pa[0]  = eps0
 pa[1]  = mu0
@@ -110,13 +110,15 @@ pa[30] = saving_step
 
 
 
-# ... discretization parameters
+# ... discretization parameters and diagnostic values (e.g. energies)
 dz = Lz/Nel
-zj = np.linspace(0, Lz, Nel + 1)
+el_b = np.linspace(0, Lz, Nel + 1)
 
 
 dv = Lv/Nv
 vj = np.linspace(-Lv/2, Lv/2, Nv + 1)
+
+en_B = np.array([])
 # ...
 
 
@@ -163,7 +165,7 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... save old positions
-    zold = deepcopy(particles[:,0])
+    zold = deepcopy(particles[:, 0])
     # ...
     
     
@@ -178,7 +180,7 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... compute hot electron current densities
-    jhnew = utils.hotCurrent(vnew[:, 0:2], 1/2*(znew + zold), wnew, zj, bsp, qe, c, bcs = bcs_f)
+    jhnew = utils.hotCurrent(vnew[:, 0:2], 1/2*(znew + zold), wnew, el_b, bsp, qe, c, bcs = bcs_f)
     # ...
      
     
@@ -189,7 +191,7 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... time integration of E,B,jc from n to n+1 with Crank-Nicolson method (use hot current density at n+1/2) 
-    ujnew = np.dot(LHSinv, np.dot(RHS,uj) + dt*Fh)
+    ujnew = np.dot(LHSinv, np.dot(RHS, uj) + dt*Fh)
     
     if bcs_d == 1:
         ujnew = np.dot(DAMPblock, ujnew)
@@ -197,7 +199,7 @@ def update(uj, particles, Ep, Bp, dt):
     
     
     # ... compute fields at particle positions with new fields (wave + background)
-    Epnew_xy, Bpnew_xy = utils.fieldInterpolation(znew, zj, bsp, ujnew, bcs_f)
+    Epnew_xy, Bpnew_xy = utils.fieldInterpolation(znew, el_b, bsp, ujnew, bcs_f)
     
     Bpnew_z = B_background_z(znew)
     rho = -me/qe*np.cross(vnew, np.array([0, 0, 1]))/Bpnew_z[:, None]
@@ -328,7 +330,7 @@ if restart == 0:
 
             u0[:,qu] = utils.L2proj(bsp, Lz, quad_points, weights, M, initial, bcs_f)
 
-        uj = np.reshape(u0,s*Nb)
+        uj = np.reshape(u0, s*Nb)
         timeb = time.time()
         print('time for intial vector assembly: ' + str(timeb - timea))
         
@@ -423,7 +425,7 @@ if restart == 0:
     
     timea = time.time()
     
-    Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], zj, bsp, uj, bcs_f)
+    Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], el_b, bsp, uj, bcs_f)
     
     
     Bp[:, 2] = B_background_z(particles[:, 0])
@@ -471,11 +473,13 @@ if restart == 0:
     file = open(title, 'ab')
 
 
-    np.savetxt(file, np.reshape(pa,(1, 8*Nb + 1)), fmt = '%1.5e')
+    np.savetxt(file, np.reshape(pa, (1, 1*Nb + 1)), fmt = '%1.5e')
+    
+    en_B  = np.append(en_B, eps0/(2*mu0)*(np.dot(np.array([0] + list(uj[2::s]) + [0]), np.dot(M, np.array([0] + list(uj[2::s]) + [0]))) + np.dot(np.array([0] + list(uj[3::s]) + [0]), np.dot(M, np.array([0] + list(uj[3::s]) + [0])))))
 
-    data = np.append(uj, np.zeros(2*Nb))
-    data = np.append(data, 0)
-    np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.5e')
+    data = np.append(uj[2::s], en_B)
+                      
+    np.savetxt(file, np.reshape(data, (1, 1*Nb + 1)), fmt = '%1.5e')
     # ...
 
 
@@ -492,10 +496,12 @@ if restart == 0:
             particles[:, 0], particles[:, 1:4], particles[:, 4], jh, uj, Ep[:, 0:2], Bp[:, 0:2], Bp[:, 2] = update(uj, particles, Ep, Bp, dt)
 
             if time_step%saving_step == 0:
+                      
                 # ... add data to file
-                data = np.append(uj, jh)
-                data = np.append(data, (time_step + 1)*dt)
-                np.savetxt(file, np.reshape(data, (1, 8*Nb + 1)), fmt = '%1.4e')
+                en_B  = np.append(en_B, eps0/(2*mu0)*(np.dot(np.array([0] + list(uj[2::s]) + [0]), np.dot(M, np.array([0] + list(uj[2::s]) + [0]))) + np.dot(np.array([0] + list(uj[3::s]) + [0]), np.dot(M, np.array([0] + list(uj[3::s]) + [0])))))
+                
+                data = np.append(uj[2::s], en_B[-1])
+                np.savetxt(file, np.reshape(data, (1, 1*Nb + 1)), fmt = '%1.4e')
                 # ...
 
                 
@@ -503,10 +509,14 @@ if restart == 0:
         except KeyboardInterrupt:
             print('Pausing...  (Hit ENTER to continue, type quit to exit.)')
             try:
+                file.close()
+                        
                 response = input()
                 if response == 'quit':
                     break
                 print('Resuming...')
+                
+                file = open(title, 'ab')
             except KeyboardInterrupt:
                 print('Resuming...')
                 continue

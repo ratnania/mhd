@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.special as sp
 from scipy.interpolate import splev
+from scipy.sparse import csr_matrix
 
 
 
@@ -390,13 +391,104 @@ def fieldInterpolation(particles_pos, nodes, basis, uj, bcs = 1):
        
         return Ep,Bp
 
+
+def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
+    '''Computes the electromagnetic fields E and B at the particle positions using the basis functions.
+    
+        Parameters:
+            particles_pos : ndarray
+                1D-array containing the particles positions.
+            nodes : ndarray
+                1D-array containing the element boundaries.
+            basis : B-spline object
+                The B-spline basis functions.
+            uj : ndarray
+                1D-array with the FEM coefficients.
+            bcs : int
+                The boundary conditions. 1: periodic, 2: homogeneous Dirichlet.
+                
+        Returns:
+            Ep : ndarray
+                2D-array (Np x 2) with the electric fields at the particle positions.
+            Bp : ndarray
+                2D-array (Np x 2) with the magnetic fields at the particle positions.
+    '''
+            
+    
+
+    if bcs == 1:
+        
+        Nel = len(nodes) - 1  
+        p = basis.p
+        Nb = Nel
+        
+        Ep = np.zeros((len(particles_pos), 2))
+        Bp = np.zeros((len(particles_pos), 2))
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+
+        ex = uj[0::6]
+        ey = uj[1::6]
+        bx = uj[2::6]
+        by = uj[3::6]
+   
+    
+        for ie in range(0, Nel):   
+       
+            indices = np.where(Zbin == ie)[0]
+              
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)
+            
+                Ep[indices, 0] += ex[i%Nb]*bi
+                Ep[indices, 1] += ey[i%Nb]*bi
+                Bp[indices, 0] += bx[i%Nb]*bi
+                Bp[indices, 1] += by[i%Nb]*bi
+       
+        return Ep, Bp
+
+    elif bcs == 2:
+        
+        Nel = len(nodes) - 1
+        p = basis.p
+        
+        Ep = np.zeros((len(particles_pos), 2))
+        Bp = np.zeros((len(particles_pos), 2))
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+
+        ex = uj[0::6]
+        ey = uj[1::6]
+        bx = uj[2::6]
+        by = uj[3::6]
+
+
+        for ie in range(0, Nel):
+
+            indices = np.where(Zbin == ie)[0]
+
+            for il in range(0, p + 1):
+
+                i = il + ie
+                bi = basis(particles_pos[indices], i)
+            
+                Ep[indices, 0] += ex[i]*bi
+                Ep[indices, 1] += ey[i]*bi
+                Bp[indices, 0] += bx[i]*bi
+                Bp[indices, 1] += by[i]*bi
+       
+        return Ep, Bp    
+    
+    
     
 def hotCurrent(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, bcs = 1, rel = 1):
-    '''Computes the hot current density on terms of the weak formulation.
+    '''Computes the hot current density in terms of the weak formulation.
     
         Parameters:
             particles_vel : ndarray
-                2D-array (Np x 2) with the particle velocities (vx,vy).
+                2D-array (Np x 2) with the particle velocities (vx, vy).
             particles_pos : ndarray
                 1D-array (Np x 1) with the particle positions (z).
             particles_wk : ndarray
@@ -416,7 +508,7 @@ def hotCurrent(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, 
                 
         Returns:
             jh : ndarray
-                1D-array with the hot current densities (jhx,jhy).
+                1D-array with the hot current densities (jhx, jhy).
     '''
 
     if bcs == 1:
@@ -486,6 +578,103 @@ def hotCurrent(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, 
                 jh[2*i + 1] += np.einsum('i,i,i', vy, wk, bi)         
 
         return qe*1/Np*jh[2:2*(Nb - 1)]
+
+
+def hotCurrentFull(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, bcs = 1, rel = 1):
+    '''Computes the hot current density in terms of the weak formulation.
+    
+        Parameters:
+            particles_vel : ndarray
+                2D-array (Np x 2) with the particle velocities (vx, vy).
+            particles_pos : ndarray
+                1D-array (Np x 1) with the particle positions (z).
+            particles_wk : ndarray
+                1D-array (Np x 1) with the particle weights.
+            nodes : ndarray
+                1D-array containing the element boundaries.
+            basis : B-spline object
+                B-spline basis functions.
+            qe : float
+                The particles' charge.
+            c : foat
+                The speed of light
+            bcs : int
+                The boundary conditions. 1: periodic, 2: homogeneous Dirichlet.
+            rel : int
+                Nonrelativistic (1) or relativistic computation (2).
+                
+        Returns:
+            jh : ndarray
+                1D-array with the hot current densities (jhx, jhy).
+    '''
+
+    if bcs == 1:
+    
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel
+        Np = len(particles_pos)
+    
+        jh = np.zeros(2*Nb)
+        
+        if rel == 2:
+            gamma = np.sqrt(1 + np.sqrt(1 + np.linalg.norm(particles_vel, axis = 1)**2/c**2))
+            particles_vel[:, 0] = particles_vel[:, 0]/gamma
+            particles_vel[:, 1] = particles_vel[:, 1]/gamma
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+            vx = particles_vel[indices, 0]
+            vy = particles_vel[indices, 1]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+            
+                jh[2*(i%Nb)] += np.einsum('i,i,i', vx, wk, bi) 
+                jh[2*(i%Nb) + 1] += np.einsum('i,i,i', vy, wk, bi)         
+
+        return qe*1/Np*jh
+
+    elif bcs == 2:
+
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel + p
+        Np = len(particles_pos)
+    
+        jh = np.zeros(2*Nb)
+        
+        if rel == 2:
+            gamma = np.sqrt(1 + np.sqrt(1 + np.linalg.norm(particles_vel, axis = 1)**2/c**2))
+            particles_vel[:, 0] = particles_vel[:, 0]/gamma
+            particles_vel[:, 1] = particles_vel[:, 1]/gamma
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+            vx = particles_vel[indices, 0]
+            vy = particles_vel[indices, 1]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+            
+                jh[2*i] += np.einsum('i,i,i', vx, wk, bi) 
+                jh[2*i + 1] += np.einsum('i,i,i', vy, wk, bi)         
+
+        return qe*1/Np*jh
     
     
 def IC(z,ini,amp,k,omega):
@@ -773,6 +962,113 @@ def matrixAssembly(basis, weights, quad_points, B0, bcs):
                     M[i,j] += value_m
                     C[i,j] += value_c
                     D[i,j] += value_d
+                    
+                    
+        return M, C, D
+    
+    
+def matrixAssemblySparse(basis, weights, quad_points, B0, bcs):
+    '''Assembles the mass, convection and field matrix of a given B-spline Finite Element basis.
+    
+        Parameters:
+            basis : B-spline object
+                The B-spline basis functions.
+            weights: ndarray
+                1D-array containing the weights of the Gauss-Legendre quadrature.
+            quad_points : ndarray
+                1D-array containing the evaluation points of the Gauss-Legendre quadrature.
+            B0 : function
+                The background magnetic field.
+            bcs : int
+                Boundary conditions. 1: periodic, 2: homogeneous Dirichlet.
+                
+        Returns:
+            M : ndarray
+                The mass matrix phi_i*phi_j (2D-array).
+            C : ndarray
+                The convection matrix phi_i*phi_j^' (2D-array).
+            D : ndarray
+                The field matrix B0*phi_i*phi_j (2D-array).
+    '''
+
+    if bcs == 1:
+
+        N = basis.N
+        p = basis.p
+        Nb = N - p
+        Nel = Nb
+        
+        M = np.zeros((Nb, Nb))
+        C = np.zeros((Nb, Nb))
+        D = np.zeros((Nb, Nb))
+
+
+        for ie in range(0, Nel):
+            for il in range(0, p + 1):
+                for jl in range(0, p + 1):
+                
+                    i = il + ie  
+                    j = jl + ie
+                
+                    value_m = 0.0
+                    value_c = 0.0
+                    value_d = 0.0
+                
+                    for g in range(0, p + 1):
+                        gl = ie*(p + 1) + g
+                    
+                        value_m += weights[gl]*basis(quad_points[gl], i, 0)*basis(quad_points[gl], j ,0)
+                        value_c += weights[gl]*basis(quad_points[gl], i ,0)*basis(quad_points[gl], j, 1)
+                        value_d += weights[gl]*basis(quad_points[gl], i, 0)*basis(quad_points[gl], j, 0)*B0(quad_points[gl])
+                    
+                    M[i%Nb, j%Nb] += value_m
+                    C[i%Nb, j%Nb] += value_c
+                    D[i%Nb, j%Nb] += value_d
+
+        return M, C, D
+
+    elif bcs == 2:
+
+        N = basis.N
+        p = basis.p
+        Nel = N - p
+        
+        row = np.array([])
+        col = np.array([])
+        
+        dat_M = np.array([])
+        dat_C = np.array([])
+        dat_D = np.array([])
+
+        
+        for ie in range(0, Nel):
+            for il in range(0, p + 1):
+                for jl in range(0, p + 1):
+                
+                    i = il + ie  
+                    j = jl + ie
+                    
+                    row = np.append(row, i)
+                    col = np.append(col, j)
+                
+                    value_m = 0.0
+                    value_c = 0.0
+                    value_d = 0.0
+
+                    for g in range(0, p + 1):
+                        gl = ie*(p + 1) + g
+                    
+                        value_m += weights[gl]*basis(quad_points[gl], i, 0)*basis(quad_points[gl], j, 0)
+                        value_c += weights[gl]*basis(quad_points[gl], i, 0)*basis(quad_points[gl], j, 1)
+                        value_d += weights[gl]*basis(quad_points[gl], i, 0)*basis(quad_points[gl], j, 0)*B0(quad_points[gl])
+                    
+                    dat_M = np.append(dat_M, value_m)
+                    dat_C = np.append(dat_C, value_c)
+                    dat_D = np.append(dat_D, value_d)
+                    
+        M = csr_matrix((dat_M, (row, col)))
+        C = csr_matrix((dat_C, (row, col)))
+        D = csr_matrix((dat_D, (row, col)))
                     
                     
         return M, C, D
