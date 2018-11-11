@@ -186,17 +186,29 @@ _Bp[:, 2] = B0z
 
 bsp_values = np.zeros(p+1, dtype=float)
 
+ex = uj[0::6]
+ey = uj[1::6]
+bx = uj[2::6]
+by = uj[3::6]
+
+knots = bsp.T
+p = bsp.p
+
 timea = time.time()
 _Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0],
-                                                             zj, bsp, uj,
+                                                             knots, p, Nz,
+                                                             ex, ey,
+                                                             bx, by,
                                                              bsp_values)
 timeb = time.time()
 print('time for new intial field interpolation: ' + str(timeb - timea))
 
 #print('Ep  = ', Ep)
 #print('_Ep = ', _Ep)
-#print('Bp  = ', Bp[:6,0])
-#print('_Bp = ', _Bp[:6,0])
+#print('Bp  = ', Bp)
+#print('_Bp = ', _Bp)
+#print('Bp  = ', Bp[:20,0])
+#print('_Bp = ', _Bp[:20,0])
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
 # ...

@@ -304,19 +304,9 @@ def createBasis(L, Nel, p, bcs = 1):
 
 
 
-def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj, values):
-    Nel = len(nodes) - 1
-    p = basis.p
-    knots = basis.T
-    Nb = Nel
-
+def block_fieldInterpolation_bc_1(particles_pos, knots, p, Nb, ex, ey, bx, by, values):
     Ep = np.zeros((len(particles_pos), 2))
     Bp = np.zeros((len(particles_pos), 2))
-
-    ex = uj[0::6]
-    ey = uj[1::6]
-    bx = uj[2::6]
-    by = uj[3::6]
 
     # ...
     npart = len(particles_pos)
@@ -336,6 +326,23 @@ def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj, values):
             Bp[ipart, 0] += bx[ii]*bi
             Bp[ipart, 1] += by[ii]*bi
     # ...
+
+    return Ep, Bp
+
+def new_fieldInterpolation_bc_1(particles_pos, knots, p, Nb, ex, ey, bx, by, values):
+    chunksize = 10
+
+    npart = len(particles_pos)
+
+    Ep = np.zeros((npart, 2))
+    Bp = np.zeros((npart, 2))
+
+    nsize = npart // chunksize
+    for i in range(0, nsize):
+        ib = i*chunksize
+        ie = ib + chunksize
+        pos = particles_pos[ib:ie]
+        Ep[ib:ie,:], Bp[ib:ie,:] = block_fieldInterpolation_bc_1(pos, knots, p, Nb, ex, ey, bx, by, values)
 
     return Ep, Bp
 
