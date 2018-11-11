@@ -313,41 +313,29 @@ def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj, values):
     Ep = np.zeros((len(particles_pos), 2))
     Bp = np.zeros((len(particles_pos), 2))
 
-    Zbin = np.digitize(particles_pos, nodes) - 1
-
     ex = uj[0::6]
     ey = uj[1::6]
     bx = uj[2::6]
     by = uj[3::6]
 
     # ...
-    def _eval_all_basis(particles_pos, p, ie):
-        npart = len(particles_pos)
-        bis = np.zeros((npart, p+1))
+    npart = len(particles_pos)
+    for ipart in range(0, npart):
+        pos = particles_pos[ipart]
+        span = find_span( knots, p, pos )
+        basis_funs( knots, p, pos, span, values )
 
-        for ipart in range(0, npart):
-            pos = particles_pos[ipart]
-            span = find_span( knots, p, pos )
-            basis_funs( knots, p, pos, span, values )
-            bis[ipart, :] = values[:]
-
-        return bis
-    # ...
-
-    for ie in range(0, Nel):
-
-        indices = np.where(Zbin == ie)[0]
-
-        bis = _eval_all_basis(particles_pos[indices], p, ie)
         for il in range(0, p + 1):
 
-            i = il + ie
-            bi = bis[:, il]
+            i = span - il
+            ii = i%Nb
+            bi = values[p-il]
 
-            Ep[indices, 0] += ex[i%Nb]*bi
-            Ep[indices, 1] += ey[i%Nb]*bi
-            Bp[indices, 0] += bx[i%Nb]*bi
-            Bp[indices, 1] += by[i%Nb]*bi
+            Ep[ipart, 0] += ex[ii]*bi
+            Ep[ipart, 1] += ey[ii]*bi
+            Bp[ipart, 0] += bx[ii]*bi
+            Bp[ipart, 1] += by[ii]*bi
+    # ...
 
     return Ep, Bp
 

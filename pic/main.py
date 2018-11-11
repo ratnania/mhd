@@ -193,6 +193,10 @@ _Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0],
 timeb = time.time()
 print('time for new intial field interpolation: ' + str(timeb - timea))
 
+#print('Ep  = ', Ep)
+#print('_Ep = ', _Ep)
+#print('Bp  = ', Bp[:6,0])
+#print('_Bp = ', _Bp[:6,0])
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
 # ...
