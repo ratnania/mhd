@@ -7,7 +7,7 @@ from scipy.sparse import csr_matrix
 from bsplines import find_span, basis_funs
 
 
-def new_borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
+def block_borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
     from numpy.linalg import norm
 
     qprime = dt*qe/(2*me)
@@ -20,6 +20,18 @@ def new_borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
         u = particles[ipart, 1:4] + qprime*E[ipart, :]
         uprime = u + np.cross(u + np.cross(u, H[ipart, :]), S)
         particles[ipart, 1:4] = uprime + qprime*E[ipart, :]
+
+def new_borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
+    chunksize = 10
+    npart = len(particles)
+    nsize = npart // chunksize
+    for i in range(0, nsize):
+        ib = i*chunksize
+        ie = ib + chunksize
+        pos = particles[ib:ie, :]
+        Bs = B[ib:ie, :]
+        Es = E[ib:ie, :]
+        block_borisPush_bc_1(pos, dt, Bs, Es, qe, me, Lz)
 
 def borisPush(particles, dt, B, E, qe, me, Lz, bcs = 1):
     '''Pushes particles by a time step dt in the electromagnetic fields E and B by using the Boris method.
