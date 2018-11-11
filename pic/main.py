@@ -203,30 +203,32 @@ _Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0],
 timeb = time.time()
 print('time for new intial field interpolation: ' + str(timeb - timea))
 
-#print('Ep  = ', Ep)
-#print('_Ep = ', _Ep)
-#print('Bp  = ', Bp)
-#print('_Bp = ', _Bp)
-#print('Bp  = ', Bp[:20,0])
-#print('_Bp = ', _Bp[:20,0])
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
+_particles = particles.copy()
 # ...
+
+# ... initialize velocities by pushing back by -dt/2, compute weights and energy of hot particles
+timea = time.time()
+
+particles[:, 1:4] = utils.borisPush(particles, -dt/2, Bp, Ep, qe, me, Lz)[1]
+
+timeb = time.time()
+print('time for intial particle push: ' + str(timeb - timea))
+#
+
+# ... ARA
+timea = time.time()
+
+utils.new_borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
+
+timeb = time.time()
+print('time for new intial particle push: ' + str(timeb - timea))
+
+assert(np.allclose(particles, _particles))
 # ...
-#
-#
-#
-#
-## ... initialize velocities by pushing back by -dt/2, compute weights and energy of hot particles
-#timea = time.time()
-#
-#particles[:, 1:4] = utils.borisPush(particles, -dt/2, Bp, Ep, qe, me, Lz)[1]
-#
-#timeb = time.time()
-#print('time for intial particle push: ' + str(timeb - timea))
-##
-#
-#
+
+
 #
 ## ... compute intial hot electron current densities (in weak formulation)
 #timea = time.time()
