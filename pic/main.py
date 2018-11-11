@@ -229,17 +229,28 @@ assert(np.allclose(particles, _particles))
 # ...
 
 
-#
-## ... compute intial hot electron current densities (in weak formulation)
-#timea = time.time()
-#
-#jh = utils.hotCurrent(particles[:, 1:3], particles[:, 0], particles[:, 4], zj, bsp, qe, c)
-#
-#timeb = time.time()
-#print('time for initial hot current computation: ' + str(timeb - timea))
-## ...
-#
-#
-## ------------------------------------------------------------------------------------------------------
-## ---------------------------------!to be accelerated!----------------------------------------------------
-#
+
+# ... compute intial hot electron current densities (in weak formulation)
+timea = time.time()
+
+jh = utils.hotCurrent(particles[:, 1:3], particles[:, 0], particles[:, 4], zj, bsp, qe, c)
+
+timeb = time.time()
+print('time for initial hot current computation: ' + str(timeb - timea))
+# ...
+
+# ... ARA
+timea = time.time()
+
+_jh = utils.new_hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
+                                knots, p, Nz, qe, c, bsp_values)
+
+timeb = time.time()
+print('time for new initial hot current computation: ' + str(timeb - timea))
+assert(np.allclose(jh, _jh))
+# ...
+
+
+# ------------------------------------------------------------------------------------------------------
+# ---------------------------------!to be accelerated!----------------------------------------------------
+

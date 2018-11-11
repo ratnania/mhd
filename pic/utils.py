@@ -553,6 +553,48 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
 
 
 
+def block_hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, values, jh):
+
+    npart = len(particles_pos)
+    for ipart in range(0, npart):
+        pos = particles_pos[ipart]
+        span = find_span( knots, p, pos )
+        basis_funs( knots, p, pos, span, values )
+
+        wk = particles_wk[ipart]
+        vx = particles_vel[ipart, 0]
+        vy = particles_vel[ipart, 1]
+
+        for il in range(0, p + 1):
+
+            i = span - il
+            ii = i%Nb
+            bi = values[p-il]
+
+            jh[2*ii] += vx * wk * bi
+            jh[2*ii + 1] += vy * wk * bi
+
+def new_hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe, c, values):
+
+    chunksize = 10
+
+    jh = np.zeros(2*Nb)
+
+    npart = len(particles_pos)
+
+    nsize = npart // chunksize
+    for i in range(0, nsize):
+        ib = i*chunksize
+        ie = ib + chunksize
+
+        vel = particles_vel[ib:ie,:]
+        pos = particles_pos[ib:ie]
+        wk  = particles_wk[ib:ie]
+        block_hotCurrent_bc_1(vel, pos, wk, knots, p, Nb, values, jh)
+
+    jh = qe/npart*jh
+    return jh
+
 def hotCurrent(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, bcs = 1, rel = 1):
     '''Computes the hot current density in terms of the weak formulation.
 
