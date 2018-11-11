@@ -4,6 +4,8 @@ from scipy.interpolate import splev
 from scipy.sparse import csr_matrix
 
 
+from bsplines import find_span, basis_funs
+
 
 def borisPush(particles, dt, B, E, qe, me, Lz, bcs = 1):
     '''Pushes particles by a time step dt in the electromagnetic fields E and B by using the Boris method.
@@ -302,9 +304,10 @@ def createBasis(L, Nel, p, bcs = 1):
 
 
 
-def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj):
+def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj, values):
     Nel = len(nodes) - 1
     p = basis.p
+    knots = basis.T
     Nb = Nel
 
     Ep = np.zeros((len(particles_pos), 2))
@@ -319,11 +322,15 @@ def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj):
 
     # ...
     def _eval_all_basis(particles_pos, p, ie):
-        bis = np.zeros((len(particles_pos[indices]), p+1))
-        for il in range(0, p + 1):
-            i = il + ie
-            bi = basis(particles_pos[indices], i)
-            bis[:, il] = bi
+        npart = len(particles_pos)
+        bis = np.zeros((npart, p+1))
+
+        for ipart in range(0, npart):
+            pos = particles_pos[ipart]
+            span = find_span( knots, p, pos )
+            basis_funs( knots, p, pos, span, values )
+            bis[ipart, :] = values[:]
+
         return bis
     # ...
 
@@ -331,7 +338,7 @@ def new_fieldInterpolation_bc_1(particles_pos, nodes, basis, uj):
 
         indices = np.where(Zbin == ie)[0]
 
-        bis = _eval_all_basis(particles_pos, p, ie)
+        bis = _eval_all_basis(particles_pos[indices], p, ie)
         for il in range(0, p + 1):
 
             i = il + ie

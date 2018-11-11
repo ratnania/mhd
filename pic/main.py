@@ -43,13 +43,15 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 # ... numerical parameters
 Lz = 300                           # ... length of z-domain
 #Nz = 1024                          # ... number of elements z-direction
-Nz = 128                          # ... number of elements z-direction
+#Nz = 128                          # ... number of elements z-direction
+Nz = 32                          # ... number of elements z-direction
 T = 200.0                          # ... simulation time
 dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 8                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-Np = np.int(1e6)                   # ... number of energetic simulation particles
+#Np = np.int(1e6)                   # ... number of energetic simulation particles
+Np = np.int(1e3)                   # ... number of energetic simulation particles
 # ...
 
 
@@ -182,8 +184,12 @@ _Ep = np.zeros((Np, 3))
 _Bp = np.zeros((Np, 3))
 _Bp[:, 2] = B0z
 
+bsp_values = np.zeros(p+1, dtype=float)
+
 timea = time.time()
-_Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0], zj, bsp, uj)
+_Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0],
+                                                             zj, bsp, uj,
+                                                             bsp_values)
 timeb = time.time()
 print('time for new intial field interpolation: ' + str(timeb - timea))
 
