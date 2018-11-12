@@ -12,6 +12,7 @@ import time
 from copy import deepcopy
 from scipy.linalg import block_diag
 import utils
+import opt_utils_v0
 
 
 # ... physical parameters
@@ -195,7 +196,7 @@ knots = bsp.T
 p = bsp.p
 
 timea = time.time()
-_Ep[:, 0:2], _Bp[:, 0:2] = utils.new_fieldInterpolation_bc_1(particles[:, 0],
+_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v0.new_fieldInterpolation_bc_1(particles[:, 0],
                                                              knots, p, Nz,
                                                              ex, ey,
                                                              bx, by,
@@ -220,7 +221,7 @@ print('time for intial particle push: ' + str(timeb - timea))
 # ... ARA
 timea = time.time()
 
-utils.new_borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
+opt_utils_v0.new_borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
 
 timeb = time.time()
 print('time for new intial particle push: ' + str(timeb - timea))
@@ -242,7 +243,7 @@ print('time for initial hot current computation: ' + str(timeb - timea))
 # ... ARA
 timea = time.time()
 
-_jh = utils.new_hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
+_jh = opt_utils_v0.new_hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
                                 knots, p, Nz, qe, c, bsp_values)
 
 timeb = time.time()
