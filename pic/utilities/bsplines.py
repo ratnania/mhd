@@ -2,6 +2,7 @@ from pyccel.decorators import types
 from pyccel.decorators import pure
 
 #==============================================================================
+@pure
 @types('double[:]','int','double')
 def find_span( knots, degree, x ):
     """
@@ -52,8 +53,8 @@ def find_span( knots, degree, x ):
     return returnVal
 
 #==============================================================================
-@types('double[:]','int','double','int','double[:]')
-def basis_funs( knots, degree, x, span, values ):
+@types('double[:]','int','double','int','double[:]','double[:]','double[:]')
+def basis_funs( knots, degree, x, span, left, right, values ):
     """
     Compute the non-vanishing B-splines at location x,
     given the knot sequence, polynomial degree and knot
@@ -89,9 +90,11 @@ def basis_funs( knots, degree, x, span, values ):
     # TODO improve
     p = degree
 
-    from numpy      import empty
-    left   = empty( p  , dtype=float )
-    right  = empty( p  , dtype=float )
+#    from numpy      import empty
+#    left   = empty( p  , dtype=float )
+#    right  = empty( p  , dtype=float )
+    left[:] = 0.
+    right[:] = 0.
 
     values[0] = 1.0
     for j in range(0,p):
