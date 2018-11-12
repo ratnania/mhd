@@ -13,6 +13,7 @@ from copy import deepcopy
 from scipy.linalg import block_diag
 import utils
 import opt_utils_v0
+import opt_utils_v1
 
 
 # ... physical parameters
@@ -180,7 +181,7 @@ Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], zj, bsp, uj)
 timeb = time.time()
 print('time for intial field interpolation: ' + str(timeb - timea))
 
-# ... ARA
+# ... ARA v0
 _Ep = np.zeros((Np, 3))
 _Bp = np.zeros((Np, 3))
 _Bp[:, 2] = B0z
@@ -196,17 +197,51 @@ knots = bsp.T
 p = bsp.p
 
 timea = time.time()
-_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v0.new_fieldInterpolation_bc_1(particles[:, 0],
+_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v0.fieldInterpolation_bc_1(particles[:, 0],
                                                              knots, p, Nz,
                                                              ex, ey,
                                                              bx, by,
                                                              bsp_values)
 timeb = time.time()
-print('time for new intial field interpolation: ' + str(timeb - timea))
+print('time for new v0 intial field interpolation: ' + str(timeb - timea))
 
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
 _particles = particles.copy()
+# ...
+
+# ... ARA v1
+_Ep = np.zeros((Np, 3))
+_Bp = np.zeros((Np, 3))
+_Bp[:, 2] = B0z
+
+bsp_values = np.zeros(p+1, dtype=float)
+
+ex = uj[0::6]
+ey = uj[1::6]
+bx = uj[2::6]
+by = uj[3::6]
+
+knots = bsp.T
+p = bsp.p
+
+timea = time.time()
+_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
+                                                             knots, p, Nz, Lz,
+                                                             ex, ey,
+                                                             bx, by,
+                                                             bsp_values)
+timeb = time.time()
+print('time for new v1 intial field interpolation: ' + str(timeb - timea))
+
+#print(Bp)
+#print(_Bp)
+
+assert(np.allclose(Ep, _Ep))
+assert(np.allclose(Bp, _Bp))
+_particles = particles.copy()
+
+import sys; sys.exit(0)
 # ...
 
 # ... initialize velocities by pushing back by -dt/2, compute weights and energy of hot particles
@@ -218,13 +253,13 @@ timeb = time.time()
 print('time for intial particle push: ' + str(timeb - timea))
 #
 
-# ... ARA
+# ... ARA v0
 timea = time.time()
 
-opt_utils_v0.new_borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
+opt_utils_v0.borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
 
 timeb = time.time()
-print('time for new intial particle push: ' + str(timeb - timea))
+print('time for new v0 intial particle push: ' + str(timeb - timea))
 
 assert(np.allclose(particles, _particles))
 # ...
@@ -240,14 +275,14 @@ timeb = time.time()
 print('time for initial hot current computation: ' + str(timeb - timea))
 # ...
 
-# ... ARA
+# ... ARA v0
 timea = time.time()
 
-_jh = opt_utils_v0.new_hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
+_jh = opt_utils_v0.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
                                 knots, p, Nz, qe, c, bsp_values)
 
 timeb = time.time()
-print('time for new initial hot current computation: ' + str(timeb - timea))
+print('time for new v0 initial hot current computation: ' + str(timeb - timea))
 assert(np.allclose(jh, _jh))
 # ...
 
