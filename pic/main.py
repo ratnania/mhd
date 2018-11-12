@@ -52,8 +52,8 @@ dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 8                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-#Np = np.int(1e6)                   # ... number of energetic simulation particles
-Np = np.int(1e3)                   # ... number of energetic simulation particles
+Np = np.int(1e6)                   # ... number of energetic simulation particles
+#Np = np.int(1e4)                   # ... number of energetic simulation particles
 # ...
 
 
@@ -181,38 +181,38 @@ Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], zj, bsp, uj)
 timeb = time.time()
 print('time for intial field interpolation: ' + str(timeb - timea))
 
-# ... ARA v0
-_Ep = np.zeros((Np, 3))
-_Bp = np.zeros((Np, 3))
-_Bp[:, 2] = B0z
-
-bsp_values = np.zeros(p+1, dtype=float)
-
-ex = uj[0::6]
-ey = uj[1::6]
-bx = uj[2::6]
-by = uj[3::6]
-
-knots = bsp.T
-p = bsp.p
-
-timea = time.time()
-_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v0.fieldInterpolation_bc_1(particles[:, 0],
-                                                             knots, p, Nz,
-                                                             ex, ey,
-                                                             bx, by,
-                                                             bsp_values)
-timeb = time.time()
-print('time for new v0 intial field interpolation: ' + str(timeb - timea))
-
-assert(np.allclose(Ep, _Ep))
-assert(np.allclose(Bp, _Bp))
-_particles = particles.copy()
-# ...
+## ... ARA v0
+#_Ep = np.zeros((Np, 3))
+#_Bp = np.zeros((Np, 3))
+#_Bp[:, 2] = B0z
+#
+#bsp_values = np.zeros(p+1, dtype=float)
+#
+#ex = uj[0::6]
+#ey = uj[1::6]
+#bx = uj[2::6]
+#by = uj[3::6]
+#
+#knots = bsp.T
+#p = bsp.p
+#
+#timea = time.time()
+#_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v0.fieldInterpolation_bc_1(particles[:, 0],
+#                                                             knots, p, Nz,
+#                                                             ex, ey,
+#                                                             bx, by,
+#                                                             bsp_values)
+#timeb = time.time()
+#print('time for new v0 intial field interpolation: ' + str(timeb - timea))
+#
+#assert(np.allclose(Ep, _Ep))
+#assert(np.allclose(Bp, _Bp))
+#_particles = particles.copy()
+## ...
 
 # ... ARA v1
-_Ep = np.zeros((Np, 3))
-_Bp = np.zeros((Np, 3))
+_Ep = np.zeros((Np, 3), order='F')
+_Bp = np.zeros((Np, 3), order='F')
 _Bp[:, 2] = B0z
 
 bsp_values = np.zeros(p+1, dtype=float)
@@ -226,11 +226,12 @@ knots = bsp.T
 p = bsp.p
 
 timea = time.time()
-_Ep[:, 0:2], _Bp[:, 0:2] = opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
-                                                             knots, p, Nz, Lz,
-                                                             ex, ey,
-                                                             bx, by,
-                                                             bsp_values)
+opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
+                                     knots, p, Nz, Lz,
+                                     ex, ey,
+                                     bx, by,
+                                     bsp_values,
+                                     _Ep,_Bp)
 timeb = time.time()
 print('time for new v1 intial field interpolation: ' + str(timeb - timea))
 

@@ -1,4 +1,5 @@
 from pyccel.decorators import types
+from pyccel.decorators import pure
 
 #==============================================================================
 @types('double[:]','int','double')
@@ -84,12 +85,16 @@ def basis_funs( knots, degree, x, span, values ):
     arrays that are one element shorter.
 
     """
+    # to avoid degree being intent(inout)
+    # TODO improve
+    p = degree
+
     from numpy      import empty
-    left   = empty( degree  , dtype=float )
-    right  = empty( degree  , dtype=float )
+    left   = empty( p  , dtype=float )
+    right  = empty( p  , dtype=float )
 
     values[0] = 1.0
-    for j in range(0,degree):
+    for j in range(0,p):
         left [j] = x - knots[span-j]
         right[j] = knots[span+1+j] - x
         saved    = 0.0

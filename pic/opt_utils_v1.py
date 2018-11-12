@@ -1,59 +1,70 @@
 import numpy as np
 from copy import deepcopy
-from bsplines import find_span, basis_funs
+import time
 
+VERSION = 0
 
-# ... NOTE: this function can not be pyccelized for the moment
-def find_tiles(particles_pos, Nz, Lz, tilesize):
-    d_tiles = {}
-    for ie in range(0, Nz, tilesize):
-        d_tiles[ie] = []
-
-    npart = len(particles_pos)
-    for ipart in range(0, npart):
-        pos = particles_pos[ipart]
-        i = int(Nz*pos/Lz)
-        ie = int(i/tilesize)*tilesize
-        d_tiles[ie] += [ipart]
-
-    return d_tiles
+# ...
+import utilities.__epyccel__core as mod
+mod = mod.epyccel__core
+if VERSION == 0:
+    core_fieldInterpolation_bc_1 = mod.fieldinterpolation_bc_1_v0
+if VERSION == 1:
+    core_fieldInterpolation_bc_1 = mod.fieldinterpolation_bc_1_v1
 # ...
 
+# ...
+def fieldInterpolation_bc_1_v0(particles_pos, knots, p, Nb, Lz, ex, ey, bx, by,
+                            values, Ep, Bp):
 
-# ... NOTE: this function can not be pyccelized for the moment
-def fieldInterpolation_bc_1(particles_pos, knots, p, Nb, Lz, ex, ey, bx, by, values):
-    tilesize = p
+    Ep[:,:2] = 0.
+    Bp[:,:2] = 0.
+
+    core_fieldInterpolation_bc_1(particles_pos, knots, p, Nb, ex, ey, bx, by, values, Ep, Bp)
+# ...
+
+# ...
+def fieldInterpolation_bc_1_v1(particles_pos, knots, p, Nb, Lz, ex, ey, bx, by,
+                            values, Ep, Bp):
+
+    # ...
+    def find_tiles(particles_pos, Nz, Lz, tilesize):
+        d_tiles = {}
+        for ie in range(0, Nz, tilesize):
+            d_tiles[ie] = []
+
+        npart = len(particles_pos)
+        for ipart in range(0, npart):
+            pos = particles_pos[ipart]
+            i = int(Nz*pos/Lz)
+            ie = int(i/tilesize)*tilesize
+            d_tiles[ie] += [ipart]
+
+        return d_tiles
+    # ...
+
+    tilesize = 10
+    tb = time.time()
     d_tiles = find_tiles(particles_pos, Nb, Lz, tilesize)
+    te = time.time()
+    print('> time tiling: ' + str(te - tb))
 
-    Ep = np.zeros((len(particles_pos), 2))
-    Bp = np.zeros((len(particles_pos), 2))
+    tb = time.time()
+
+    Ep[:,:2] = 0.
+    Bp[:,:2] = 0.
 
     # ...
     for ie, ipositions in d_tiles.items():
         positions = deepcopy(particles_pos[ipositions])
         core_fieldInterpolation_bc_1(positions, ipositions, knots, p, Nb, Lz, ex, ey, bx, by, values, Ep, Bp)
     # ...
-
-    return Ep, Bp
+    te = time.time()
+    print('> time interpolation: ' + str(te - tb))
 # ...
 
-def core_fieldInterpolation_bc_1(positions, ipositions, knots, p, Nb, Lz, ex, ey, bx,
-                                 by, values, Ep, Bp):
+if VERSION == 0:
+    fieldInterpolation_bc_1 = fieldInterpolation_bc_1_v0
+if VERSION == 1:
+    fieldInterpolation_bc_1 = fieldInterpolation_bc_1_v1
 
-    npart = len(positions)
-    for ilpart in range(0, npart):
-        ipart = ipositions[ilpart]
-        pos = positions[ilpart]
-        span = find_span( knots, p, pos )
-        basis_funs( knots, p, pos, span, values )
-
-        for il in range(0, p + 1):
-
-            i = span - il
-            ii = i%Nb
-            bi = values[p-il]
-
-            Ep[ipart, 0] += ex[ii]*bi
-            Ep[ipart, 1] += ey[ii]*bi
-            Bp[ipart, 0] += bx[ii]*bi
-            Bp[ipart, 1] += by[ii]*bi
