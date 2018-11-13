@@ -44,9 +44,9 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 # ... numerical parameters
 Lz = 300                           # ... length of z-domain
-#Nz = 1024                          # ... number of elements z-direction
+Nz = 1024                          # ... number of elements z-direction
 #Nz = 128                          # ... number of elements z-direction
-Nz = 32                          # ... number of elements z-direction
+#Nz = 32                          # ... number of elements z-direction
 T = 200.0                          # ... simulation time
 dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
@@ -167,6 +167,15 @@ particles[:, 4] = np.random.rand(Np)
 # ---------------------------------!to be accelerated!----------------------------------------------------
 # ------------------------------------------------------------------------------------------------------
 
+# dictionary for timing
+d_times = {}
+d_times['initial'] = {}
+d_times['v0'] = {}
+d_times['v1'] = {}
+d_times_initial = d_times['initial']
+d_times_v0 = d_times['v0']
+d_times_v1 = d_times['v1']
+
 
 
 # ... initial fields at particle positions
@@ -179,7 +188,7 @@ timea = time.time()
 Ep[:, 0:2], Bp[:, 0:2] = utils.fieldInterpolation(particles[:, 0], zj, bsp, uj)
 
 timeb = time.time()
-print('time for intial field interpolation: ' + str(timeb - timea))
+d_times_initial['field interpolation'] = timeb - timea
 
 # ... ARA
 _Ep = np.zeros((Np, 3), order='F')
@@ -201,7 +210,7 @@ opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
                                      bx, by,
                                      _Ep,_Bp)
 timeb = time.time()
-print('time for new field interpolation: ' + str(timeb - timea))
+d_times_v0['field interpolation'] = timeb - timea
 
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
@@ -219,7 +228,7 @@ timea = time.time()
 particles[:, 1:4] = utils.borisPush(particles, -dt/2, Bp, Ep, qe, me, Lz)[1]
 
 timeb = time.time()
-print('time for intial particle push: ' + str(timeb - timea))
+d_times_initial['particle push'] = timeb - timea
 #
 
 
@@ -229,7 +238,7 @@ timea = time.time()
 opt_utils_v1.borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
 
 timeb = time.time()
-print('time for new particle push: ' + str(timeb - timea))
+d_times_v0['particle push'] = timeb - timea
 
 assert(np.allclose(particles, _particles))
 # ...
@@ -241,7 +250,7 @@ opt_utils_v1.new_borisPush_bc_1(_new_particles, -dt/2, qe, me, Lz, knots, p, Nz,
                                 ex, ey, bx, by, B0z)
 
 timeb = time.time()
-print('time for new particle push + interpolation: ' + str(timeb - timea))
+d_times_v1['particle push + interpolation'] = timeb - timea
 
 assert(np.allclose(particles, _new_particles))
 # ...
@@ -253,7 +262,7 @@ timea = time.time()
 jh = utils.hotCurrent(particles[:, 1:3], particles[:, 0], particles[:, 4], zj, bsp, qe, c)
 
 timeb = time.time()
-print('time for initial hot current computation: ' + str(timeb - timea))
+d_times_initial['hot current'] = timeb - timea
 # ...
 
 # ... ARA
@@ -265,9 +274,38 @@ opt_utils_v1.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4]
                              knots, p, Nz, qe, c, _jh)
 
 timeb = time.time()
-print('time for new hot current computation: ' + str(timeb - timea))
+d_times_v0['hot current'] = timeb - timea
+d_times_v1['hot current'] = timeb - timea
 assert(np.allclose(jh, _jh))
 # ...
+
+d_times_initial['particle push + interpolation'] = d_times_initial['particle push'] + d_times_initial['field interpolation']
+d_times_v0['particle push + interpolation'] = d_times_v0['particle push'] + d_times_v0['field interpolation']
+
+from tabulate import tabulate
+headers = ['version', 'field interpolation', 'particle push',
+           'particle push + interpolation', 'hot current', 'total']
+table   = []
+
+d = d_times_initial
+total = d['particle push + interpolation'] + d['hot current']
+line    = ['initial', d['field interpolation'], d['particle push'],
+           d['particle push + interpolation'], d['hot current'], total]
+table.append(line)
+
+d = d_times_v0
+total = d['particle push + interpolation'] + d['hot current']
+line    = ['v0', d['field interpolation'], d['particle push'],
+           d['particle push + interpolation'], d['hot current'], total]
+table.append(line)
+
+d = d_times_v1
+total = d['particle push + interpolation'] + d['hot current']
+line    = ['v1', '', '',
+           d['particle push + interpolation'], d['hot current'], total]
+table.append(line)
+print(tabulate(table, headers))
+
 
 
 # ------------------------------------------------------------------------------------------------------
