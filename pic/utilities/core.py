@@ -58,7 +58,7 @@ def hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe
     npart = len(particles_pos)
 
     #$ omp parallel
-    #$ omp do private ( ipart, pos, span, left, right, values, wk, vx, vy, il, i, ii, bi )
+    #$ omp do reduction ( + : jh ) private ( ipart, pos, span, left, right, values, wk, vx, vy, il, i, ii, bi )
     for ipart in range(0, npart):
         pos = particles_pos[ipart]
         span = find_span( knots, p, pos )

@@ -252,8 +252,7 @@ opt_utils_v1.new_borisPush_bc_1(_new_particles, -dt/2, qe, me, Lz, knots, p, Nz,
 timeb = time.time()
 d_times_v1['particle push + interpolation'] = timeb - timea
 
-# TODO uncomment assert
-#assert(np.allclose(particles, _new_particles))
+assert(np.allclose(particles, _new_particles))
 # ...
 
 
@@ -278,8 +277,7 @@ timeb = time.time()
 d_times_v0['hot current'] = timeb - timea
 d_times_v1['hot current'] = timeb - timea
 
-# TODO uncomment assert
-#assert(np.allclose(jh, _jh))
+assert(np.allclose(jh, _jh))
 # ...
 
 d_times_initial['particle push + interpolation'] = d_times_initial['particle push'] + d_times_initial['field interpolation']
