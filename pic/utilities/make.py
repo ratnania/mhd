@@ -66,7 +66,7 @@ def make_library():
     os.system(cmd)
 
 def make_clean():
-    cmd = 'rm -f *.f90 *.o *.mod *.a *.pyh'
+    cmd = 'rm -f *.f90 *.o *.mod *.a *.pyh *.so'
     os.system(cmd)
 
 def make_header(fname):

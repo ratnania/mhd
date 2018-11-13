@@ -203,14 +203,9 @@ opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
 timeb = time.time()
 print('time for new intial field interpolation: ' + str(timeb - timea))
 
-#print(Bp)
-#print(_Bp)
-
 assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
 _particles = particles.copy()
-
-import sys; sys.exit(0)
 # ...
 
 # ... initialize velocities by pushing back by -dt/2, compute weights and energy of hot particles
@@ -222,16 +217,16 @@ timeb = time.time()
 print('time for intial particle push: ' + str(timeb - timea))
 #
 
-# ... ARA v0
-timea = time.time()
-
-opt_utils_v0.borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
-
-timeb = time.time()
-print('time for new v0 intial particle push: ' + str(timeb - timea))
-
-assert(np.allclose(particles, _particles))
-# ...
+## ... ARA v0
+#timea = time.time()
+#
+#opt_utils_v0.borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
+#
+#timeb = time.time()
+#print('time for new v0 intial particle push: ' + str(timeb - timea))
+#
+#assert(np.allclose(particles, _particles))
+## ...
 
 
 
@@ -244,14 +239,16 @@ timeb = time.time()
 print('time for initial hot current computation: ' + str(timeb - timea))
 # ...
 
-# ... ARA v0
+# ... ARA
 timea = time.time()
 
-_jh = opt_utils_v0.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
-                                knots, p, Nz, qe, c, bsp_values)
+_jh = np.zeros(2*Nb)
+
+opt_utils_v1.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
+                             knots, p, Nz, qe, c, _jh)
 
 timeb = time.time()
-print('time for new v0 initial hot current computation: ' + str(timeb - timea))
+print('time for new initial hot current computation: ' + str(timeb - timea))
 assert(np.allclose(jh, _jh))
 # ...
 
