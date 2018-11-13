@@ -90,7 +90,7 @@ def make_header(fname):
 
 def make_f2py():
     import core as mod
-    mod = epyccel(mod, libs=[libname], libdirs=[os.getcwd()])
+    mod = epyccel(mod, libs=[libname], libdirs=[os.getcwd()], openmp=True)
 
 make_clean()
 make_library()

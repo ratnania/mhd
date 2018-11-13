@@ -56,6 +56,9 @@ def hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe
     # ...
 
     npart = len(particles_pos)
+
+    #$ omp parallel
+    #$ omp do private ( ipart, pos, span, left, right, values, wk, vx, vy, il, i, ii, bi )
     for ipart in range(0, npart):
         pos = particles_pos[ipart]
         span = find_span( knots, p, pos )
@@ -74,6 +77,9 @@ def hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe
             jh[2*ii] += vx * wk * bi
             jh[2*ii + 1] += vy * wk * bi
 
+    #$ omp end do
+    #$ omp end parallel
+
     jh = qe/npart*jh
 
 
@@ -89,6 +95,7 @@ def borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
 
     qprime = dt*qe/(2*me)
     npart = len(particles)
+
     for ipart in range(0, npart):
         normB = B[ipart,0]**2 + B[ipart,1]**2 + B[ipart,2]**2
         r = 1 + (qprime**2)*normB
@@ -121,6 +128,9 @@ def new_borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, 
 
     qprime = dt*qe/(2*me)
     npart = len(particles)
+
+    #$ omp parallel
+    #$ omp do private ( ipart, pos, span, left, right, values, E, B, normB, r, S, u, uxb, uprime, tmp, il, i, ii, bi )
     for ipart in range(0, npart):
         # ... field interpolation
         E[:] = 0.
@@ -146,10 +156,17 @@ def new_borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, 
         normB = B[0]**2 + B[1]**2 + B[2]**2
         r = 1 + (qprime**2)*normB
         S = 2*qprime*B[:]/r
-        x0 = particles[ipart, 0]
         u = particles[ipart, 1:4] + qprime*E[:]
         cross( u, B[:], uxb )
         uxb = qprime*uxb
         cross( u + uxb, S, tmp )
         uprime = u + tmp
         particles[ipart, 1:4] = uprime + qprime*E[:]
+
+    #$ omp end do
+    #$ omp end parallel
+
+    # TODO remove this line later, once fixed in pyccel
+    err = 0
+
+
