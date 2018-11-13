@@ -3,6 +3,7 @@ from pyccel.decorators import pure
 
 from bsplines import find_span
 from bsplines import basis_funs
+from algebra  import cross
 
 #==============================================================================
 @types('double[:]','double[:]','int','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)')
@@ -74,3 +75,28 @@ def hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe
             jh[2*ii + 1] += vy * wk * bi
 
     jh = qe/npart*jh
+
+
+#==============================================================================
+@types('double[:,:](order=F)','double','double[:,:](order=F)','double[:,:](order=F)','double','double','double')
+def borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
+
+    from numpy      import zeros
+
+    u   = zeros( 3, dtype=float )
+    uxb = zeros( 3, dtype=float )
+    tmp = zeros( 3, dtype=float )
+
+    qprime = dt*qe/(2*me)
+    npart = len(particles)
+    for ipart in range(0, npart):
+        normB = B[ipart,0]**2 + B[ipart,1]**2 + B[ipart,2]**2
+        r = 1 + (qprime**2)*normB
+        S = 2*qprime*B[ipart, :]/r
+        x0 = particles[ipart, 0]
+        u = particles[ipart, 1:4] + qprime*E[ipart, :]
+        cross( u, B[ipart, :], uxb )
+        uxb = qprime*uxb
+        cross( u + uxb, S, tmp )
+        uprime = u + tmp
+        particles[ipart, 1:4] = uprime + qprime*E[ipart, :]

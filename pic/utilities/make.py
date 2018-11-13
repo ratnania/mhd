@@ -33,7 +33,7 @@ def get_types_decorator(cls):
 files = [f for f in listdir('.') if isfile(join('.', f)) and
          f.split('.')[-1] == 'py' and  not( os.path.basename(f) == 'make.py' )]
 
-library_files = ['bsplines.py']
+library_files = ['bsplines.py', 'algebra.py']
 
 libname = 'coco'
 
