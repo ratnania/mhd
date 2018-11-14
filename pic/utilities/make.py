@@ -102,8 +102,8 @@ def make_f2py(compiler='gnu95'):
                   compiler=compiler)
 
 
-COMPILER = 'ifort'
-#COMPILER = 'gfortran'
+#COMPILER = 'ifort'
+COMPILER = 'gfortran'
 
 make_clean()
 make_library(compiler=COMPILER)
