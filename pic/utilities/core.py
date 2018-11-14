@@ -90,8 +90,10 @@ def borisPush_bc_1(particles, dt, B, E, qe, me, Lz):
     from numpy      import zeros
 
     u   = zeros( 3, dtype=float )
+    uprime = zeros( 3  , dtype=float )
     uxb = zeros( 3, dtype=float )
     tmp = zeros( 3, dtype=float )
+    S      = zeros( 3  , dtype=float )
 
     qprime = dt*qe/(2*me)
     npart = len(particles)
@@ -119,10 +121,12 @@ def new_borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, 
     right  = empty( p  , dtype=float )
     values = zeros( p+1, dtype=float )
     u      = zeros( 3  , dtype=float )
+    uprime = zeros( 3  , dtype=float )
     uxb    = zeros( 3  , dtype=float )
     tmp    = zeros( 3  , dtype=float )
     E      = zeros( 3  , dtype=float )
     B      = zeros( 3  , dtype=float )
+    S      = zeros( 3  , dtype=float )
 
     span = 0
 
@@ -155,10 +159,10 @@ def new_borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, 
 
         normB = B[0]**2 + B[1]**2 + B[2]**2
         r = 1 + (qprime**2)*normB
-        S = 2*qprime*B[:]/r
+        S[:] = 2*qprime*B[:]/r
         u = particles[ipart, 1:4] + qprime*E[:]
         cross( u, B[:], uxb )
-        uxb = qprime*uxb
+        uxb[:] = qprime*uxb[:]
         cross( u + uxb, S, tmp )
         uprime = u + tmp
         particles[ipart, 1:4] = uprime + qprime*E[:]
@@ -167,6 +171,6 @@ def new_borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, 
     #$ omp end parallel
 
     # TODO remove this line later, once fixed in pyccel
-    err = 0
+    ierr = 0
 
 

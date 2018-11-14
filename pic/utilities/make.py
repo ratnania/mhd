@@ -40,6 +40,7 @@ libname = 'coco'
 def compile_py(fname, compiler='gfortran', flags='-fPIC -O2 -c'):
     # ... run pyccel
     cmd = 'pyccel -t {fname}'.format(fname=fname)
+    print(cmd)
     os.system(cmd)
     # ...
 
@@ -47,15 +48,16 @@ def compile_py(fname, compiler='gfortran', flags='-fPIC -O2 -c'):
     fname = os.path.basename(fname).split('.')[0] + '.f90'
     cmd = '{compiler} {flags} {fname}'
     cmd = cmd.format(compiler=compiler, flags=flags, fname=fname)
+    print(cmd)
     os.system(cmd)
     # ...
 
-def make_library():
+def make_library(compiler='gfortran'):
     mypath = '.'
     files = library_files
 
     for f in files:
-        compile_py(f)
+        compile_py(f, compiler=compiler)
 #        make_header(f)
 
     fnames = [os.path.basename(f).split('.')[0] for f in files]
@@ -88,10 +90,12 @@ def make_header(fname):
         f.write('\n')
     f.close()
 
-def make_f2py():
+def make_f2py(compiler='gnu95'):
     import core as mod
-    mod = epyccel(mod, libs=[libname], libdirs=[os.getcwd()], openmp=True)
+    mod = epyccel(mod, libs=[libname], libdirs=[os.getcwd()], openmp=True,
+                  compiler=compiler)
 
-make_clean()
-make_library()
-make_f2py()
+
+#make_clean()
+#make_library(compiler='ifort')
+make_f2py(compiler='ifort')
