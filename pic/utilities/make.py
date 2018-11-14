@@ -37,7 +37,13 @@ library_files = ['bsplines.py', 'algebra.py']
 
 libname = 'coco'
 
-def compile_py(fname, compiler='gfortran', flags='-fPIC -O2 -c'):
+def compile_py(fname, compiler='gfortran'):
+    if compiler == 'gfortran':
+        flags='-fPIC -O2 -c'
+
+    elif compiler == 'ifort':
+        flags='-fPIC -fast -c'
+
     # ... run pyccel
     cmd = 'pyccel -t {fname}'.format(fname=fname)
     print(cmd)
@@ -96,6 +102,9 @@ def make_f2py(compiler='gnu95'):
                   compiler=compiler)
 
 
-#make_clean()
-#make_library(compiler='ifort')
-make_f2py(compiler='ifort')
+COMPILER = 'ifort'
+#COMPILER = 'gfortran'
+
+make_clean()
+make_library(compiler=COMPILER)
+make_f2py(compiler=COMPILER)
