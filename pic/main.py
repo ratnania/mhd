@@ -9,11 +9,17 @@
 
 import numpy as np
 import time
-from copy import deepcopy
 from scipy.linalg import block_diag
 import utils
-import opt_utils_v0
-import opt_utils_v1
+import opt_utils
+
+
+######################################
+#  calling epyccel
+######################################
+from pyccel.epyccel import epyccel
+opt_utils = epyccel( opt_utils )
+######################################
 
 
 # ... physical parameters
@@ -44,16 +50,16 @@ eps = 0.0                          # ... amplitude of spatial pertubation of dis
 
 # ... numerical parameters
 Lz = 300                           # ... length of z-domain
-Nz = 1024                          # ... number of elements z-direction
+#Nz = 1024                          # ... number of elements z-direction
 #Nz = 128                          # ... number of elements z-direction
-#Nz = 32                          # ... number of elements z-direction
+Nz = 32                          # ... number of elements z-direction
 T = 200.0                          # ... simulation time
 dt = 0.05                          # ... time step
 p = 3                              # ... degree of B-spline basis
 Lv = 8                             # ... length of v-domain in each direction (vx,vy,vz)
 Nv = 76                            # ... number of cells in each v-direction (vx,vy,vz)
-Np = np.int(1e6)                   # ... number of energetic simulation particles
-#Np = np.int(1e4)                   # ... number of energetic simulation particles
+#Np = np.int(1e6)                   # ... number of energetic simulation particles
+Np = np.int(1e4)                   # ... number of energetic simulation particles
 # ...
 
 
@@ -164,6 +170,7 @@ particles[:, 4] = np.random.rand(Np)
 
 
 
+
 # ---------------------------------!to be accelerated!----------------------------------------------------
 # ------------------------------------------------------------------------------------------------------
 
@@ -191,8 +198,8 @@ timeb = time.time()
 d_times_initial['field interpolation'] = timeb - timea
 
 # ... ARA
-_Ep = np.zeros((Np, 3), order='F')
-_Bp = np.zeros((Np, 3), order='F')
+_Ep = np.zeros((Np, 3))
+_Bp = np.zeros((Np, 3))
 _Bp[:, 2] = B0z
 
 ex = uj[0::6]
@@ -204,7 +211,7 @@ knots = bsp.T
 p = bsp.p
 
 timea = time.time()
-opt_utils_v1.fieldInterpolation_bc_1(particles[:, 0],
+opt_utils.fieldInterpolation_bc_1(particles[:, 0],
                                      knots, p, Nz, Lz,
                                      ex, ey,
                                      bx, by,
@@ -216,10 +223,10 @@ assert(np.allclose(Ep, _Ep))
 assert(np.allclose(Bp, _Bp))
 # ...
 
-_particles = np.zeros(particles.shape, order='F')
+_particles = np.zeros(particles.shape)
 _particles[:,:] = particles[:,:]
 
-_new_particles = np.zeros(particles.shape, order='F')
+_new_particles = np.zeros(particles.shape)
 _new_particles[:,:] = particles[:,:]
 
 # ... initialize velocities by pushing back by -dt/2, compute weights and energy of hot particles
@@ -231,22 +238,10 @@ timeb = time.time()
 d_times_initial['particle push'] = timeb - timea
 #
 
-
 # ... ARA
 timea = time.time()
 
-opt_utils_v1.borisPush_bc_1(_particles, -dt/2, Bp, Ep, qe, me, Lz)
-
-timeb = time.time()
-d_times_v0['particle push'] = timeb - timea
-
-assert(np.allclose(particles, _particles))
-# ...
-
-# ... ARA
-timea = time.time()
-
-opt_utils_v1.new_borisPush_bc_1(_new_particles, -dt/2, qe, me, Lz, knots, p, Nz,
+opt_utils.borisPush_bc_1(_new_particles, -dt/2, qe, me, Lz, knots, p, Nz,
                                 ex, ey, bx, by, B0z)
 
 timeb = time.time()
@@ -270,7 +265,7 @@ timea = time.time()
 
 _jh = np.zeros(2*Nb)
 
-opt_utils_v1.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
+opt_utils.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4],
                              knots, p, Nz, qe, c, _jh)
 
 timeb = time.time()
@@ -280,32 +275,32 @@ d_times_v1['hot current'] = timeb - timea
 assert(np.allclose(jh, _jh))
 # ...
 
-d_times_initial['particle push + interpolation'] = d_times_initial['particle push'] + d_times_initial['field interpolation']
-d_times_v0['particle push + interpolation'] = d_times_v0['particle push'] + d_times_v0['field interpolation']
-
-from tabulate import tabulate
-headers = ['version', 'field interpolation', 'particle push',
-           'particle push + interpolation', 'hot current', 'total']
-table   = []
-
-d = d_times_initial
-total = d['particle push + interpolation'] + d['hot current']
-line    = ['initial', d['field interpolation'], d['particle push'],
-           d['particle push + interpolation'], d['hot current'], total]
-table.append(line)
-
-d = d_times_v0
-total = d['particle push + interpolation'] + d['hot current']
-line    = ['v0', d['field interpolation'], d['particle push'],
-           d['particle push + interpolation'], d['hot current'], total]
-table.append(line)
-
-d = d_times_v1
-total = d['particle push + interpolation'] + d['hot current']
-line    = ['v1', '', '',
-           d['particle push + interpolation'], d['hot current'], total]
-table.append(line)
-print(tabulate(table, headers, tablefmt='latex'))
+#d_times_initial['particle push + interpolation'] = d_times_initial['particle push'] + d_times_initial['field interpolation']
+#d_times_v0['particle push + interpolation'] = d_times_v0['particle push'] + d_times_v0['field interpolation']
+#
+#from tabulate import tabulate
+#headers = ['version', 'field interpolation', 'particle push',
+#           'particle push + interpolation', 'hot current', 'total']
+#table   = []
+#
+#d = d_times_initial
+#total = d['particle push + interpolation'] + d['hot current']
+#line    = ['initial', d['field interpolation'], d['particle push'],
+#           d['particle push + interpolation'], d['hot current'], total]
+#table.append(line)
+#
+#d = d_times_v0
+#total = d['particle push + interpolation'] + d['hot current']
+#line    = ['v0', d['field interpolation'], d['particle push'],
+#           d['particle push + interpolation'], d['hot current'], total]
+#table.append(line)
+#
+#d = d_times_v1
+#total = d['particle push + interpolation'] + d['hot current']
+#line    = ['v1', '', '',
+#           d['particle push + interpolation'], d['hot current'], total]
+#table.append(line)
+#print(tabulate(table, headers, tablefmt='latex'))
 
 
 
