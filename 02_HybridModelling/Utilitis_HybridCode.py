@@ -2,6 +2,7 @@ import numpy as np
 import scipy.special as sp
 from scipy.interpolate import splev
 from scipy.sparse import csr_matrix
+from multiprocessing import Pool
 
 
 
@@ -78,7 +79,6 @@ def borisPush(particles, dt, B, E, qe, me, Lz, bcs = 1):
         znew[indices_left] = particles[indices_left, 0] + dt*vnew[indices_left, 2]
        
         return znew, vnew
-    
 
     
     
@@ -303,7 +303,7 @@ def createBasis(L, Nel, p, bcs = 1):
     
     
 def fieldInterpolation(particles_pos, nodes, basis, uj, bcs = 1):
-    '''Computes the electromagnetic fields E and B at the particle positions using the basis functions.
+    '''Computes the electromagnetic fields E and B at the particle positions using the finite element basis functions.
     
         Parameters:
             particles_pos : ndarray
@@ -343,11 +343,11 @@ def fieldInterpolation(particles_pos, nodes, basis, uj, bcs = 1):
         by = uj[3::6]
    
     
-        for ie in range(0, Nel):   
+        for ie in range(Nel):   
        
             indices = np.where(Zbin == ie)[0]
               
-            for il in range(0, p + 1):
+            for il in range(p + 1):
             
                 i = il + ie
                 bi = basis(particles_pos[indices], i)
@@ -375,11 +375,11 @@ def fieldInterpolation(particles_pos, nodes, basis, uj, bcs = 1):
         by = np.array([0] + list(uj[3::6]) + [0]) 
 
 
-        for ie in range(0, Nel):
+        for ie in range(Nel):
 
             indices = np.where(Zbin == ie)[0]
-
-            for il in range(0, p + 1):
+            
+            for il in range(p + 1):
 
                 i = il + ie
                 bi = basis(particles_pos[indices], i)
@@ -389,10 +389,16 @@ def fieldInterpolation(particles_pos, nodes, basis, uj, bcs = 1):
                 Bp[indices, 0] += bx[i]*bi
                 Bp[indices, 1] += by[i]*bi
        
-        return Ep,Bp
+        return Ep, Bp
 
 
-def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
+    
+    
+
+    
+    
+    
+def fieldInterpolation_full(particles_pos, nodes, basis, uj, bcs = 1):
     '''Computes the electromagnetic fields E and B at the particle positions using the basis functions.
     
         Parameters:
@@ -409,7 +415,7 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
                 
         Returns:
             Ep : ndarray
-                2D-array (Np x 2) with the electric fields at the particle positions.
+                2D-array (Np x 3) with the electric fields at the particle positions.
             Bp : ndarray
                 2D-array (Np x 2) with the magnetic fields at the particle positions.
     '''
@@ -422,15 +428,16 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
         p = basis.p
         Nb = Nel
         
-        Ep = np.zeros((len(particles_pos), 2))
+        Ep = np.zeros((len(particles_pos), 3))
         Bp = np.zeros((len(particles_pos), 2))
     
         Zbin = np.digitize(particles_pos, nodes) - 1
 
-        ex = uj[0::6]
-        ey = uj[1::6]
-        bx = uj[2::6]
-        by = uj[3::6]
+        ex = uj[0::8]
+        ey = uj[1::8]
+        ez = uj[2::8]
+        bx = uj[3::8]
+        by = uj[4::8]
    
     
         for ie in range(0, Nel):   
@@ -444,6 +451,7 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
             
                 Ep[indices, 0] += ex[i%Nb]*bi
                 Ep[indices, 1] += ey[i%Nb]*bi
+                Ep[indices, 2] += ez[i%Nb]*bi
                 Bp[indices, 0] += bx[i%Nb]*bi
                 Bp[indices, 1] += by[i%Nb]*bi
        
@@ -454,15 +462,16 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
         Nel = len(nodes) - 1
         p = basis.p
         
-        Ep = np.zeros((len(particles_pos), 2))
+        Ep = np.zeros((len(particles_pos), 3))
         Bp = np.zeros((len(particles_pos), 2))
     
         Zbin = np.digitize(particles_pos, nodes) - 1
 
-        ex = uj[0::6]
-        ey = uj[1::6]
-        bx = uj[2::6]
-        by = uj[3::6]
+        ex = uj[0::8]
+        ey = uj[1::8]
+        ez = uj[2::8]
+        bx = uj[3::8]
+        by = uj[4::8]
 
 
         for ie in range(0, Nel):
@@ -476,6 +485,7 @@ def fieldInterpolationFull(particles_pos, nodes, basis, uj, bcs = 1):
             
                 Ep[indices, 0] += ex[i]*bi
                 Ep[indices, 1] += ey[i]*bi
+                Ep[indices, 2] += ez[i]*bi
                 Bp[indices, 0] += bx[i]*bi
                 Bp[indices, 1] += by[i]*bi
        
@@ -578,6 +588,109 @@ def hotCurrent(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, 
                 jh[2*i + 1] += np.einsum('i,i,i', vy, wk, bi)         
 
         return qe*1/Np*jh[2:2*(Nb - 1)]
+    
+    
+def hotCurrent_all_components(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, bcs = 1, rel = 1):
+    '''Computes the hot current density in terms of the weak formulation.
+    
+        Parameters:
+            particles_vel : ndarray
+                2D-array (Np x 3) with the particle velocities (vx, vy, vz).
+            particles_pos : ndarray
+                1D-array (Np x 1) with the particle positions (z).
+            particles_wk : ndarray
+                1D-array (Np x 1) with the particle weights.
+            nodes : ndarray
+                1D-array containing the element boundaries.
+            basis : B-spline object
+                B-spline basis functions.
+            qe : float
+                The particles' charge.
+            c : foat
+                The speed of light
+            bcs : int
+                The boundary conditions. 1: periodic, 2: homogeneous Dirichlet.
+            rel : int
+                Nonrelativistic (1) or relativistic computation (2).
+                
+        Returns:
+            jh : ndarray
+                1D-array with the hot current densities (jhx, jhy, jhz).
+    '''
+
+    if bcs == 1:
+    
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel
+        Np = len(particles_pos)
+    
+        jh = np.zeros(3*Nb)
+        
+        if rel == 2:
+            gamma = np.sqrt(1 + np.sqrt(1 + np.linalg.norm(particles_vel, axis = 1)**2/c**2))
+            particles_vel[:, 0] = particles_vel[:, 0]/gamma
+            particles_vel[:, 1] = particles_vel[:, 1]/gamma
+            particles_vel[:, 2] = particles_vel[:, 2]/gamma
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+            vx = particles_vel[indices, 0]
+            vy = particles_vel[indices, 1]
+            vz = particles_vel[indices, 2]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+            
+                jh[3*(i%Nb)] += np.einsum('i,i,i', vx, wk, bi) 
+                jh[3*(i%Nb) + 1] += np.einsum('i,i,i', vy, wk, bi)
+                jh[3*(i%Nb) + 2] += np.einsum('i,i,i', vz, wk, bi)  
+
+        return qe*1/Np*jh
+
+    elif bcs == 2:
+
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel + p
+        Np = len(particles_pos)
+    
+        jh = np.zeros(3*Nb)
+        
+        if rel == 2:
+            gamma = np.sqrt(1 + np.sqrt(1 + np.linalg.norm(particles_vel, axis = 1)**2/c**2))
+            particles_vel[:, 0] = particles_vel[:, 0]/gamma
+            particles_vel[:, 1] = particles_vel[:, 1]/gamma
+            particles_vel[:, 2] = particles_vel[:, 2]/gamma
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+            vx = particles_vel[indices, 0]
+            vy = particles_vel[indices, 1]
+            vz = particles_vel[indices, 2]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+            
+                jh[3*i] += np.einsum('i,i,i', vx, wk, bi) 
+                jh[3*i + 1] += np.einsum('i,i,i', vy, wk, bi)
+                jh[3*i + 2] += np.einsum('i,i,i', vz, wk, bi)
+
+        return qe*1/Np*jh[3:3*(Nb - 1)]
 
 
 def hotCurrentFull(particles_vel, particles_pos, particles_wk, nodes, basis, qe, c, bcs = 1, rel = 1):
@@ -675,6 +788,84 @@ def hotCurrentFull(particles_vel, particles_pos, particles_wk, nodes, basis, qe,
                 jh[2*i + 1] += np.einsum('i,i,i', vy, wk, bi)         
 
         return qe*1/Np*jh
+    
+
+    
+    
+def hotdensity_full(particles_pos, particles_wk, nodes, basis, bcs = 1):
+    '''Computes the hot density in terms of the weak formulation.
+    
+        Parameters:
+            particles_pos : ndarray
+                1D-array (Np x 1) with the particle positions (z).
+            particles_wk : ndarray
+                1D-array (Np x 1) with the particle weights.
+            nodes : ndarray
+                1D-array containing the element boundaries.
+            basis : B-spline object
+                B-spline basis functions.
+            bcs : int
+                The boundary conditions. 1: periodic, 2: homogeneous Dirichlet.
+                
+        Returns:
+            nh : ndarray
+                1D-array with the hot density.
+    '''
+
+    if bcs == 1:
+    
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel
+        Np = len(particles_pos)
+    
+        nh = np.zeros(Nb)
+    
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+                nh[i%Nb] += np.dot(bi, wk)
+
+        return 1/Np*nh
+
+    elif bcs == 2:
+
+        Nel = len(nodes) - 1
+        p = basis.p
+        Nb = Nel + p
+        Np = len(particles_pos)
+    
+        nh = np.zeros(Nb)
+        
+        Zbin = np.digitize(particles_pos, nodes) - 1
+    
+        for ie in range(0, Nel):
+        
+            indices = np.where(Zbin == ie)[0]
+            wk = particles_wk[indices]
+        
+            for il in range(0, p + 1):
+            
+                i = il + ie
+                bi = basis(particles_pos[indices], i)         
+         
+                nh[i] += np.dot(bi, wk)
+
+        return 1/Np*nh[1:(Nb - 1)]    
+    
+    
+    
+    
+    
     
     
 def IC(z,ini,amp,k,omega):
@@ -785,7 +976,125 @@ def IC(z,ini,amp,k,omega):
         
         return np.array([Ex0, Ey0, Bx0, By0, jx0, jy0])
     
+  
+
+ 
+def IC_full(z, ini, amp, k, omega):
+    '''Defines the initial conditions of the simulation.
     
+        Parameters: 
+            z : ndarray
+                Positions to be evaluated.
+            ini : int
+                Type of inital conditions.
+            amp : float
+                Amplitude of the initial perturbations.
+            k : float
+                Wavenumber of initial perturbations.
+            omega : float
+                Frequency of initial perturbations.
+                
+        Returns:
+            initial : ndarray
+                2D-array (6 x len(z)) with the initial values.
+    '''
+    
+    if ini == 1:
+ 
+        eps0 = 1.0
+        wce = -1.0
+        wpe = 2.0
+
+        Ex0 = +amp*np.cos(k*z)
+        Ey0 = -amp*np.sin(k*z)
+        
+        Bx0 = -Ey0*k/omega
+        By0 = +Ex0*k/omega
+        
+        Dj = eps0*wpe**2*(omega - wce)/(wce**2 - omega**2)
+        
+        jx0 = -Ey0*Dj
+        jy0 = +Ex0*Dj
+            
+        return np.array([Ex0, Ey0, Bx0, By0, jx0, jy0])
+    
+    elif ini == 2:
+        
+        Ex0 = +amp*np.real(np.exp(1j*k*z))
+        Ey0 = -amp*np.imag(np.exp(1j*k*z))
+        
+        Bx0 = k*amp*np.imag(1/omega*np.exp(1j*k*z))
+        By0 = k*amp*np.real(1/omega*np.exp(1j*k*z))
+        
+        Dj = eps0*wpe**2*(omega - wce)/(wce**2 - omega**2)
+        
+        jx0 = amp*np.imag(Dj*np.exp(1j*k*z))
+        jy0 = amp*np.real(Dj*np.exp(1j*k*z))
+            
+        return np.array([Ex0, Ey0, Bx0, By0, Bz0, jx0, jy0])
+    
+    elif ini == 3:
+        
+        Ex0 = 0*z
+        Ey0 = 0*z
+        n0 = 0*z
+        
+        Bx0 = amp*np.sin(k*z)
+        By0 = 0*z
+        
+        
+        jx0 = 0*z
+        jy0 = 0*z
+        jz0 = 0*z
+            
+        return np.array([Ex0, Ey0, n0, Bx0, By0, jx0, jy0, jz0])
+    
+    elif ini == 4:
+        
+        Ex0 = 0*z
+        Ey0 = 0*z
+        
+        Bx0 = amp*np.random.randn()
+        By0 = amp*np.random.randn()
+        
+        jx0 = 0*z
+        jy0 = 0*z
+            
+        return np.array([Ex0, Ey0, Bx0, By0, jx0, jy0])
+      
+    
+    elif ini == 5:
+        
+        Ex0 = amp*np.random.randn()
+        Ey0 = amp*np.random.randn()
+        
+        Bx0 = amp*np.random.randn()
+        By0 = amp*np.random.randn()
+        
+        jx0 = amp*np.random.randn()
+        jy0 = amp*np.random.randn()
+        
+        return np.array([Ex0, Ey0, Bx0, By0, jx0, jy0])
+        
+    elif ini == 6:
+        
+        Ex0 = 0*z
+        Ey0 = 0*z
+        
+        Bx0 = 0*z
+        By0 = 0*z
+        
+        jx0 = 0*z
+        jy0 = 0*z
+        
+        return np.array([Ex0, Ey0, Bx0, By0, jx0, jy0])
+
+
+
+
+
+
+
 def L2proj(basis, L, quad_points, weights, mass, fun, bcs = 1):
     '''Computes the coefficients of some given function in the B-spline basis using the L2-projection.
     
