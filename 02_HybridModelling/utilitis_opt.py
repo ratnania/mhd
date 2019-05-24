@@ -5,9 +5,9 @@ import scipy.special as sp
 
 
 #===============================================================================================================
-def matrixAssembly(p, Nbase, T, bc):
+def matrixAssembly_V0(p, Nbase, T, bc):
     """
-    Computes the 1d mass and advection matrix of the space V0.
+    Computes the 1d mass and advection matrix in the space V0.
     
     Parameters
     ----------
@@ -32,12 +32,6 @@ def matrixAssembly(p, Nbase, T, bc):
         advection matrix in V0
     """
     
-    if bc == True: 
-        bcon = 1
-        Nbase_0 = Nbase - p
-    else:
-        bcon = 0
-        Nbase_0 = Nbase
     
     el_b = inter.construct_grid_from_knots(p, Nbase, T)
     ne = len(el_b) - 1
@@ -85,9 +79,68 @@ def matrixAssembly(p, Nbase, T, bc):
 
 
 #===============================================================================================================
+def matrixAssembly_V1(p, Nbase, T, bc):
+    """
+    Computes the 1d mass matrix in the space V1.
+    
+    Parameters
+    ----------
+    p : int
+        spline degree
+    
+    Nbase : int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    M : 2d np.array
+        mass matrix in V1
+    """
+    
+    t = T[1:-1]
+    
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    ne = len(el_b) - 1
+
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p)
+    pts, wts = inter.construct_quadrature_grid(ne, p, pts_loc, wts_loc, el_b)
+
+    d = 0
+    basis = inter.eval_on_grid_splines_ders(p - 1, Nbase - 1, p, d, t, pts)
+
+    M = np.zeros((Nbase - 1, Nbase - 1))
+
+    for ie in range(ne):
+        for il in range(p):
+            for jl in range(p):
+                i = ie + il
+                j = ie + jl
+
+                value_m = 0.
+
+                for g in range(p):
+                    value_m += wts[g, ie]*basis[il, 0, g, ie]*basis[jl, 0, g, ie]
+
+                M[i, j] += p/(t[i + p] - t[i])*p/(t[j + p] - t[j])*value_m
+                
+    if bc == True:
+        M[:p - 1, :] += M[-p + 1:, :]
+        M[:, :p - 1] += M[:, -p + 1:]
+        M = M[:M.shape[0] - p + 1, :M.shape[1] - p + 1]
+                               
+    return M
+
+
+#===============================================================================================================
 def matrixAssembly_backgroundField(p, Nbase, T, bc, B_background_z):
     """
-    Computes the 1d mass and advection matrix of the space V0.
+    Computes the 1d mass matrix weighted with some background field in the space V0.
     
     Parameters
     ----------
@@ -157,7 +210,7 @@ def matrixAssembly_backgroundField(p, Nbase, T, bc, B_background_z):
 
 
 #===============================================================================================================
-def L2_prod(fun, p, Nbase, T):
+def L2_prod_V0(fun, p, Nbase, T):
     """
     Computes the L2 scalar product of the function 'fun' with the B-splines of the space V0
     using a quadrature rule of order p + 1.
@@ -209,9 +262,61 @@ def L2_prod(fun, p, Nbase, T):
 
 
 #===============================================================================================================
-def evaluate_field(vec, x, p, Nbase, T, bc):
+def L2_prod_V1(fun, p, Nbase, T):
     """
-    Evaluates the 1d FEM field of the space V0 at the points x.
+    Computes the L2 scalar product of the function 'fun' with the B-splines of the space V1
+    using a quadrature rule of order p + 1.
+    
+    Parameters
+    ----------
+    fun : callable
+        function for scalar product
+    
+    p : int
+        spline degree
+    
+    Nbase : int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    Returns
+    -------
+    f_int : np.array
+        the result of the integration with each basis function
+    """
+    
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    ne = len(el_b) - 1 
+    
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
+    pts, wts = inter.construct_quadrature_grid(ne, p + 1, pts_loc, wts_loc, el_b)
+    
+    t = T[1:-1]
+    
+    d = 0
+    basis = inter.eval_on_grid_splines_ders(p - 1, Nbase - 1, p + 1, d, t, pts)
+    
+    f_int = np.zeros(Nbase - 1)
+    
+    for ie in range(ne):
+        for il in range(p):
+            i = ie + il
+            
+            value = 0.
+            for g in range(p + 1):
+                value += wts[g, ie]*fun(pts[g, ie])*basis[il, 0, g, ie]
+                
+            f_int[i] += value*p/(t[i + p] - t[i])
+            
+    return f_int
+
+
+#===============================================================================================================
+def evaluate_field_V0(vec, x, p, Nbase, T, bc):
+    """
+    Evaluates the 1d FEM field in the space V0 at the points x.
     
     Parameters
     ----------
@@ -254,6 +359,355 @@ def evaluate_field(vec, x, p, Nbase, T, bc):
         
     return eva
 
+
+
+#===============================================================================================================
+def evaluate_field_V1(vec, x, p, Nbase, T, bc):
+    """
+    Evaluates the 1d FEM field in the space V1 at the points x.
+    
+    Parameters
+    ----------
+    vec : np.array
+        coefficient vector
+        
+    x : np.array
+        evaluation points
+        
+    p : int
+        spline degree
+        
+    Nbase : int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    eval: np.arrray
+        the function values at the points x
+    """
+    
+    t = T[1:-1]
+    
+    if bc == True:
+        D = inter.collocation_matrix(p - 1, Nbase - 1, t, x)
+        
+        D[:, :(p - 1)] += D[:, -(p - 1):]
+        D = D[:, :D.shape[1] - (p - 1)]
+        
+        for j in range(Nbase - p):
+            D[:, j] = p*D[:, j]/(t[j + p] - t[j])
+            
+        D = sparse.csr_matrix(D)
+        
+    else:
+        D = inter.collocation_matrix(p - 1, Nbase - 1, t, x)
+        
+        for j in range(Nbase - 1):
+            D[:, j] = p*D[:, j]/(t[j + p] - t[j])
+            
+        D = sparse.csr_matrix(D)
+    
+    eva = D.dot(vec)
+    
+    return eva
+
+
+
+
+#===============================================================================================================
+def GRAD_1d(p, Nbase, bc):
+    """
+    Returns the 1d discrete gradient matrix.
+    
+    Parameters
+    ----------
+    p : int
+        spline degree
+        
+    Nbase : int
+        number of spline functions
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    G: 2d np.array
+        discrete gradient matrix
+    """
+    
+    if bc == True:
+        Nbase_0 = Nbase - p
+        
+        G = np.zeros((Nbase_0, Nbase_0))
+        
+        for i in range(Nbase_0):
+            G[i, i] = -1.
+            if i < Nbase_0 - 1:
+                G[i, i + 1] = 1.
+                
+        G[-1, 0] = 1.
+        
+        return G
+    
+    else:
+        
+        G = np.zeros((Nbase - 1, Nbase))
+    
+        for i in range(Nbase - 1):
+            G[i, i] = -1.
+            G[i, i  + 1] = 1.
+            
+        if bc == False:
+            G = G[:, 1:-1]
+
+        return G
+
+#===============================================================================================================
+def histopolation_matrix_1d(p, Nbase, T, grev, bc):
+    """
+    Computest the 1d histopolation matrix.
+    
+    Parameters
+    ----------
+    p : int
+        spline degree
+        
+    Nbase : int
+        number of spline functions
+    
+    T : np.array 
+        knot vector
+    
+    grev : np.array
+        greville points
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    D : 2d np.array
+        histopolation matrix
+    """
+    
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    Nel = len(el_b) - 1
+    
+    
+    if bc == True:
+        if p%2 != 0:
+            dx = el_b[-1]/Nel
+            ne = Nbase - 1
+            
+            pts_loc, wts_loc = np.polynomial.legendre.leggauss(p - 1)
+            pts, wts = inter.construct_quadrature_grid(ne, p - 1, pts_loc, wts_loc, grev)
+
+            col_quad = inter.collocation_matrix(p - 1, ne, T[1:-1], (pts%el_b[-1]).flatten())/dx
+
+            D = np.zeros((ne, ne))
+
+            for i in range(ne):
+                for j in range(ne):
+                    for k in range(p - 1):
+                        D[i, j] += wts[k, i]*col_quad[i + ne*k, j]
+
+            lower = int(np.ceil(p/2) - 1)
+            upper = -int(np.floor(p/2))
+
+            D[:, :(p - 1)] += D[:, -(p - 1):]
+            D = D[lower:upper, :D.shape[1] - (p - 1)]
+
+            return D
+        
+        else:
+            dx = el_b[-1]/Nel
+            ne = Nbase - 1
+            
+            a = grev
+            b = grev + dx/2
+            c = np.vstack((a, b)).reshape((-1,), order = 'F')[:-1]
+            
+            pts_loc, wts_loc = np.polynomial.legendre.leggauss(p - 1) 
+            pts, wts = inter.construct_quadrature_grid(2*ne, p - 1, pts_loc, wts_loc, c)
+            
+            col_quad = inter.collocation_matrix(p - 1, ne, T[1:-1], (pts%el_b[-1]).flatten())/dx
+            
+            D = np.zeros((ne, ne))
+            
+            for il in range(2*ne):
+                i = int(np.floor(il/2))
+                for j in range(ne):
+                    for k in range(p - 1):
+                        D[i, j] += wts[k, il]*col_quad[il + 2*ne*k, j] 
+                        
+            lower = int(np.ceil(p/2) - 1)
+            upper = -int(np.floor(p/2))
+
+            D[:, :(p - 1)] += D[:, -(p - 1):]
+            D = D[lower:upper, :D.shape[1] - (p - 1)]
+
+            return D
+        
+    else:
+        return inter.histopolation_matrix(p, Nbase, T, grev)
+
+        
+
+#=============================================================================================================== 
+def integrate_1d(points, weights, fun):
+    """
+    Integrates the function 'fun' over the quadrature grid defined by (points, weights) in 1d.
+    
+    Parameters
+    ----------
+    points : 2d np.array
+        quadrature points in format (local point, element)
+        
+    weights : 2d np.array
+        quadrature weights in format (local point, element)
+    
+    fun : callable
+        1d function to be integrated
+        
+    Returns
+    -------
+    f_int : np.array
+        the value of the integration in each element
+    """
+    
+    k = points.shape[0]
+    n = points.shape[1]
+    
+    f_int = np.zeros(n)
+    
+    for ie in range(n):
+        for g in range(k):
+            f_int[ie] += weights[g, ie]*fun(points[g, ie])
+        
+    return f_int
+ 
+    
+    
+
+#===============================================================================================================        
+def PI_0_1d(fun, p, Nbase, T, bc):
+    """
+    Computes the FEM coefficient of the function 'fun' projected on the space V0.
+    
+    Parameters
+    ----------
+    fun : callable
+        the function to be projected
+        
+    p : int
+        spline degree
+        
+    Nbase: int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    
+    vec : np.array
+        the FEM coefficients
+    """
+    
+    # compute greville points
+    grev = inter.compute_greville(p, Nbase, T)
+    
+    # assemble vector of interpolation problem at greville points
+    rhs = fun(grev)
+    
+    # assemble interpolation matrix
+    N = inter.collocation_matrix(p, Nbase, T, grev)       
+    
+    # apply boundary conditions
+    if bc == True:
+        lower =  int(np.floor(p/2))
+        upper = -int(np.ceil(p/2))
+            
+        N[:, :p] += N[:, -p:]
+        N = N[lower:upper, :N.shape[1] - p]
+        
+        rhs = rhs[lower:upper]
+        
+        
+    # solve interpolation problem
+    vec = np.linalg.solve(N, rhs)
+    
+    return vec
+
+
+#===============================================================================================================
+def PI_1_1d(fun, p, Nbase, T, bc):
+    """
+    Computes the FEM coefficient of the function 'fun' projected on the space V1.
+    
+    Parameters
+    ----------
+    fun : callable
+        the function to be projected
+        
+    p : int
+        spline degree
+        
+    Nbase : int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    
+    vec : np.array
+        the FEM coefficients
+    """
+    
+    # compute greville points
+    grev = inter.compute_greville(p, Nbase, T)
+    
+    # compute quadrature grid
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p)
+    pts, wts = inter.construct_quadrature_grid(Nbase - 1, p, pts_loc, wts_loc, grev)
+    
+    # compute element boundaries to get length of domain for periodic boundary conditions
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    
+    # assemble vector of histopolation problem at greville points
+    rhs = integrate_1d(pts%el_b[-1], wts, fun)
+    
+    # assemble histopolation matrix
+    D = histopolation_matrix_1d(p, Nbase, T, grev, bc)
+    
+    # apply boundary conditions
+    if bc == True:
+        lower = int(np.ceil(p/2) - 1)
+        upper = -int(np.floor(p/2))
+        
+        rhs = rhs[lower:upper]
+        
+    
+    # solve histopolation problem
+    vec = np.linalg.solve(D, rhs)
+    
+    return vec
 
 
 #===============================================================================================================
