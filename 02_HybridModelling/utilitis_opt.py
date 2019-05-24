@@ -711,7 +711,54 @@ def PI_1_1d(fun, p, Nbase, T, bc):
 
 
 #===============================================================================================================
-def solveDispersionHybrid(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it = 100):
+def solveDispersionHybrid(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it=100):
+    """
+    Solves the hybrid dispersion relation numerically using Newton's method for a fixed wavenumber k.
+    
+    Parameters
+    ----------
+    k : double
+        wavenumber
+        
+    pol : int
+        wave polarization (+1 : R-wave, -1: L-wave)
+        
+    c : double
+        the speed of light
+        
+    wce : double
+        electron cyclotron frequency
+        
+    wpe : double
+        cold electron plasma frequency
+        
+    wpar : double
+        parallel thermal velocity of energetic electrons
+        
+    wperp : double
+        perpendicular thermal velocity of energetic electrons
+        
+    nuh : double
+        ratio between cold and energetic electron number densities
+        
+    initial_guess : complex
+        initial guess of solution for initialization of Newton's method
+        
+    tol : double
+        tolerance when to stop Newton interation (difference between two successive interations)
+        
+    max_it : int
+        maximum number of iterations
+        
+    Returns
+    -------
+    
+    w : complex
+        solution (frequency) of dispersion realation
+        
+    counter : int
+        number of needed iterations
+    """
 
     Taniso = 1 - wperp**2/wpar**2
 
@@ -753,7 +800,54 @@ def solveDispersionHybrid(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, 
 
 
 #===============================================================================================================
-def solveDispersionHybridExplicit(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it = 100):
+def solveDispersionHybridExplicit(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it=100):
+    """
+    Solves the hybrid dispersion relation numerically using Newton's method for a fixed wavenumber k.
+    
+    Parameters
+    ----------
+    k : double
+        wavenumber
+        
+    pol : int
+        wave polarization (+1 : R-wave, -1: L-wave)
+        
+    c : double
+        the speed of light
+        
+    wce : double
+        electron cyclotron frequency
+        
+    wpe : double
+        cold electron plasma frequency
+        
+    wpar : double
+        parallel thermal velocity of energetic electrons
+        
+    wperp : double
+        perpendicular thermal velocity of energetic electrons
+        
+    nuh : double
+        ratio between cold and energetic electron number densities
+        
+    initial_guess : complex
+        initial guess of solution for initialization of Newton's method
+        
+    tol : double
+        tolerance when to stop Newton interation (difference between two successive interations)
+        
+    max_it : int
+        maximum number of iterations
+        
+    Returns
+    -------
+    
+    w : complex
+        solution (frequency) of dispersion realation
+        
+    counter : int
+        number of needed iterations
+    """
 
     def Dcold(k, w, pol):
         return 1 - k**2*c**2/w**2 - wpe**2/(w*(w + pol*wce))
@@ -784,6 +878,44 @@ def solveDispersionHybridExplicit(k, pol, c, wce, wpe, wpar, wperp, nuh, initial
 
 #===============================================================================================================
 def solveDispersionCold(k, pol, c, wce, wpe, initial_guess, tol, max_it = 100):
+    """
+    Solves the cold plasma dispersion relation numerically using Newton's method for a fixed wavenumber k.
+    
+    Parameters
+    ----------
+    k : double
+        wavenumber
+        
+    pol : int
+        wave polarization (+1 : R-wave, -1: L-wave)
+        
+    c : double
+        the speed of light
+        
+    wce : double
+        electron cyclotron frequency
+        
+    wpe : double
+        cold electron plasma frequency
+        
+    initial_guess : complex
+        initial guess of solution for initialization of Newton's method
+        
+    tol : double
+        tolerance when to stop Newton interation (difference between two successive interations)
+        
+    max_it : int
+        maximum number of iterations
+        
+    Returns
+    -------
+    
+    w : complex
+        solution (frequency) of dispersion realation
+        
+    counter : int
+        number of needed iterations
+    """
 
     def Dcold(k, w, pol):
         return 1 - k**2*c**2/w**2 - wpe**2/(w*(w + pol*wce))
