@@ -110,77 +110,6 @@ def basis_funs(knots, degree, x, span, left, right, values):
 
 #==============================================================================
 @external_call
-@types('double[:]','double[:]','int','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)')
-def fieldInterpolation_bc_1(particles_pos, knots, p, Nb, ex, ey, bx, by, Ep, Bp):
-
-    # ... needed for splines evaluation
-    from numpy      import empty
-    from numpy      import zeros
-
-    left   = empty(p,     dtype=float )
-    right  = empty(p,     dtype=float )
-    values = zeros(p + 1, dtype=float )
-
-    span = 0
-    # ...
-
-    # ...
-    npart = len(particles_pos)
-    for ipart in range(0, npart):
-        pos = particles_pos[ipart]
-        span = find_span(knots, p, pos)
-        basis_funs(knots, p, pos, span, left, right, values)
-
-        for il in range(0, p + 1):
-
-            i = span - il
-            ii = i%Nb
-            bi = values[p - il]
-
-            Ep[ipart, 0] += ex[ii]*bi
-            Ep[ipart, 1] += ey[ii]*bi
-            Bp[ipart, 0] += bx[ii]*bi
-            Bp[ipart, 1] += by[ii]*bi
-    # ...
-
-
-#==============================================================================
-@external_call
-@types('double[:]','double[:]','int','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)')
-def fieldInterpolation_bc_2(particles_pos, knots, p, Nb, ex, ey, bx, by, Ep, Bp):
-
-    # ... needed for splines evaluation
-    from numpy      import empty
-    from numpy      import zeros
-
-    left   = empty(p,     dtype=float )
-    right  = empty(p,     dtype=float )
-    values = zeros(p + 1, dtype=float )
-
-    span = 0
-    # ...
-
-    # ...
-    npart = len(particles_pos)
-    for ipart in range(0, npart):
-        pos = particles_pos[ipart]
-        span = find_span(knots, p, pos)
-        basis_funs(knots, p, pos, span, left, right, values)
-
-        for il in range(0, p + 1):
-
-            i = span - il
-            bi = values[p - il]
-
-            Ep[ipart, 0] += ex[i]*bi
-            Ep[ipart, 1] += ey[i]*bi
-            Bp[ipart, 0] += bx[i]*bi
-            Bp[ipart, 1] += by[i]*bi
-    # ...
-
-
-#==============================================================================
-@external_call
 @types('double[:,:](order=F)','double[:]','double[:]','double[:]','int','int','double','double[:]')
 def hotCurrent_bc_1(particles_vel, particles_pos, particles_wk, knots, p, Nb, qe, jh):
     
@@ -272,63 +201,81 @@ def hotCurrent_bc_2(particles_vel, particles_pos, particles_wk, knots, p, qe, jh
 
 #==============================================================================
 @external_call
-@types('double[:,:](order=F)','double','double','double','double','double[:]','int','int','double[:]','double[:]','double[:]','double[:]','double')
-def borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, B0z):
+@types('double[:,:](order=F)','double','double','double','double','double[:]','double[:]','int','int','double[:]','double[:]','double[:]','double[:]','double')
+def borisGem_bc_1(particles, dt, qe, me, Lz, T, tz, p, Nb, ex, ey, bx, by, B0z):
 
     from numpy      import empty
     from numpy      import zeros
 
-    left   = empty(p,     dtype=float)
-    right  = empty(p,     dtype=float)
-    values = zeros(p + 1, dtype=float)
-    u      = zeros(3,     dtype=float)
-    uprime = zeros(3,     dtype=float)
-    uxb    = zeros(3,     dtype=float)
-    tmp    = zeros(3,     dtype=float)
-    E      = zeros(3,     dtype=float)
-    B      = zeros(3,     dtype=float)
-    S      = zeros(3,     dtype=float)
+    l0 = empty(p,     dtype=float)
+    r0 = empty(p,     dtype=float)
+    v0 = zeros(p + 1, dtype=float)
+    
+    l1 = empty(p - 1, dtype=float)
+    r1 = empty(p - 1, dtype=float)
+    v1 = zeros(p,     dtype=float)
+    
+    u   = zeros(3,    dtype=float)
+    up  = zeros(3,    dtype=float)
+    uxb = zeros(3,    dtype=float)
+    tmp = zeros(3,    dtype=float)
+    E   = zeros(3,    dtype=float)
+    B   = zeros(3,    dtype=float)
+    S   = zeros(3,    dtype=float)
 
-    span = 0
+    s0 = 0
+    s1 = 0
 
     qprime = dt*qe/(2*me)
     npart = len(particles)
+    dz = Lz/Nb
 
     #$ omp parallel
-    #$ omp do private ( ipart, pos, span, left, right, values, E, B, normB, r, S, u, uxb, uprime, tmp, il, i, ii, bi )
-    for ipart in range(0, npart):
+    #$ omp do private ( ip, pos, s0, l0, r0, v0, s1, l1, r1, v1, E, B, normB, r, S, u, uxb, up, tmp, il0, i0, ii0, bi0, il1, i1, ii1, bi1)
+    for ip in range(0, npart):
         # ... field interpolation
         E[:] = 0.
         B[:] = 0.
         B[2] = B0z
 
-        pos = particles[ipart, 0]
-        span = find_span(knots, p, pos)
-        basis_funs(knots, p, pos, span, left, right, values)
+        pos = particles[ip, 0]
+        
+        s0 = find_span(T, p, pos)
+        s1 = find_span(tz, p - 1, pos)
+        
+        basis_funs(T, p, pos, s0, l0, r0, v0)
+        basis_funs(tz, p - 1, pos, s1, l1, r1, v1)
 
-        for il in range(0, p + 1):
+        for il0 in range(0, p + 1):
 
-            i = span - il
-            ii = i%Nb
-            bi = values[p - il]
+            i0 = s0 - il0
+            ii0 = i0%Nb
+            bi0 = v0[p - il0]
 
-            E[0] += ex[ii]*bi
-            E[1] += ey[ii]*bi
-            B[0] += bx[ii]*bi
-            B[1] += by[ii]*bi
+            E[0] += ex[ii0]*bi0
+            E[1] += ey[ii0]*bi0
+            
+        for il1 in range(0, p):
+
+            i1 = s1 - il1
+            ii1 = i1%Nb
+            bi1 = v1[p - 1 - il1]/dz
+
+            B[0] += bx[ii1]*bi1
+            B[1] += by[ii1]*bi1
         # ...
 
         normB = B[0]**2 + B[1]**2 + B[2]**2
         r = 1 + (qprime**2)*normB
         S[:] = 2*qprime*B[:]/r
-        u = particles[ipart, 1:4] + qprime*E[:]
+        u = particles[ip, 1:4] + qprime*E[:]
         cross(u, B[:], uxb)
         uxb[:] = qprime*uxb[:]
         cross(u + uxb, S, tmp)
-        uprime = u + tmp
-        particles[ipart, 1:4] = uprime + qprime*E[:]
-        particles[ipart, 0] += dt*particles[ipart, 3]
-        particles[ipart, 0] = particles[ipart, 0]%Lz 
+        up = u + tmp
+        particles[ip, 1:4] = up + qprime*E[:]
+        particles[ip, 0] += dt*particles[ip, 3]
+        particles[ip, 0] = particles[ip, 0]%Lz 
 
     #$ omp end do
     #$ omp end parallel
@@ -339,57 +286,74 @@ def borisPush_bc_1(particles, dt, qe, me, Lz, knots, p, Nb, ex, ey, bx, by, B0z)
     
 #==============================================================================
 @external_call
-@types('double[:,:](order=F)','double','double','double','double[:]','int','double[:]','double[:]','double[:]','double[:]','double','double','double')
-def borisPush_bc_2(particles, dt, qe, me, knots, p, ex, ey, bx, by, B0z, xi, Lz):
+@types('double[:,:](order=F)','double','double','double','double[:]','double[:]','int','double[:]','double[:]','double[:]','double[:]','double','double','double')
+def borisGem_bc_2(particles, dt, qe, me, T, tz, p, ex, ey, bx, by, B0z, xi, Lz):
 
     from numpy      import empty
     from numpy      import zeros
 
-    left   = empty(p,     dtype=float)
-    right  = empty(p,     dtype=float)
-    values = zeros(p + 1, dtype=float)
-    u      = zeros(3,     dtype=float)
-    uprime = zeros(3,     dtype=float)
-    uxb    = zeros(3,     dtype=float)
-    tmp    = zeros(3,     dtype=float)
-    E      = zeros(3,     dtype=float)
-    B      = zeros(3,     dtype=float)
-    S      = zeros(3,     dtype=float)
-    ez     = zeros(3,     dtype=float)
-    rho    = zeros(3,     dtype=float)
+    l0 = empty(p,     dtype=float)
+    r0 = empty(p,     dtype=float)
+    v0 = zeros(p + 1, dtype=float)
+    
+    l1 = empty(p - 1, dtype=float)
+    r1 = empty(p - 1, dtype=float)
+    v1 = zeros(p,     dtype=float)
+    
+    u   = zeros(3,    dtype=float)
+    up  = zeros(3,    dtype=float)
+    uxb = zeros(3,    dtype=float)
+    tmp = zeros(3,    dtype=float)
+    E   = zeros(3,    dtype=float)
+    B   = zeros(3,    dtype=float)
+    S   = zeros(3,    dtype=float)
+    ez  = zeros(3,    dtype=float)
+    rho = zeros(3,    dtype=float)
     
     ez[2] = 1.
-    span = 0
+
+    s0 = 0
+    s1 = 0
 
     qprime = dt*qe/(2*me)
     npart = len(particles)
 
     #$ omp parallel
-    #$ omp do private ( ipart, pos, span, left, right, values, E, B, rho, normB, r, S, u, uxb, uprime, tmp, il, i, bi )
+    #$ omp do private ( ipart, pos, s0, l0, r0, v0, s1, l1, r1, v1, E, B, rho, normB, r, S, u, uxb, up, tmp, il0, i0, bi0, il1, i1, bi1 )
     for ipart in range(0, npart):
         # ... field interpolation (wave + background)
         pos = particles[ipart, 0]
-        span = find_span(knots, p, pos)
-        basis_funs(knots, p, pos, span, left, right, values)
+        
+        s0 = find_span(T, p, pos)
+        s1 = find_span(tz, p - 1, pos)
+        
+        basis_funs(T, p, pos, s0, l0, r0, v0)
+        basis_funs(tz, p - 1, pos, s1, l1, r1, v1)
         
         if (particles[ipart, 0] + dt*particles[ipart, 3] > Lz) or (particles[ipart, 0] + dt*particles[ipart, 3] < 0.):
             particles[ipart, 3] = -particles[ipart, 3]
-        
+            
         E[:] = 0.
         B[:] = 0.
         B[2] = B0z*(1 + xi*(pos - Lz/2)**2)
         
         rho[:] = 0.
 
-        for il in range(0, p + 1):
+        for il0 in range(0, p + 1):
 
-            i = span - il
-            bi = values[p - il]
+            i0 = s0 - il0
+            bi0 = v0[p - il0]
 
-            E[0] += ex[i]*bi
-            E[1] += ey[i]*bi
-            B[0] += bx[i]*bi
-            B[1] += by[i]*bi
+            E[0] += ex[i0]*bi0
+            E[1] += ey[i0]*bi0
+            
+        for il1 in range(0, p):
+
+            i1 = s1 - il1
+            bi1 = v1[p - 1 - il1]*p/(tz[i1 + p] - tz[i1])
+
+            B[0] += bx[i1]*bi1
+            B[1] += by[i1]*bi1
             
         cross(particles[ipart, 1:4], ez, rho)
         B[0] += me*rho[0]/(qe*B[2])*(pos - Lz/2)*B0z*xi
@@ -403,8 +367,8 @@ def borisPush_bc_2(particles, dt, qe, me, knots, p, ex, ey, bx, by, B0z, xi, Lz)
         cross(u, B[:], uxb)
         uxb[:] = qprime*uxb[:]
         cross(u + uxb, S, tmp)
-        uprime = u + tmp
-        particles[ipart, 1:4] = uprime + qprime*E[:]
+        up = u + tmp
+        particles[ipart, 1:4] = up + qprime*E[:]
         particles[ipart, 0] += dt*particles[ipart, 3]
 
     #$ omp end do
