@@ -7,14 +7,14 @@ import psydac.core.interface as inter
 import time
 
 import utilitis_opt as utils_opt
-import utilitis_pic_Rel
+import utilitis_pic_GEM
 
 
 #====================================================================================
 #  calling epyccel
 #====================================================================================
 from pyccel.epyccel import epyccel
-utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
+utils_pic_fast = epyccel(utilitis_pic_GEM, accelerator='openmp')
 print('pyccelization of pic functions done!')
 #====================================================================================
 
@@ -22,7 +22,7 @@ print('pyccelization of pic functions done!')
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
 save = 1
-title = 'test_maxgrowth_rel2.txt' 
+title = 'test_growth.txt' 
 #====================================================================================
 
 
@@ -41,11 +41,11 @@ qe = -1.0                          # electron charge
 me = 1.0                           # electron mass
 B0z = 1.0                          # minimum of background magnetic field in z-direction
 wce = qe*B0z/me                    # electron cyclotron frequency
-wpe = 5*np.abs(wce)                # cold electron plasma frequency
-nuh = 6e-3                         # ratio of cold/hot electron densities (nh/nc)
+wpe = 2*np.abs(wce)                # cold electron plasma frequency
+nuh = 6e-2                         # ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # hot electron density
 wpar = 0.2*c                       # parallel thermal velocity of energetic particles
-wperp = 0.55*c                     # perpendicular thermal velocity of energetic particles
+wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
 #====================================================================================
 
 
@@ -58,7 +58,7 @@ eps = 0.                           # amplitude of spatial pertubation of initial
 
 Ex0 = lambda z : 0*z               # initial Ex
 Ey0 = lambda z : 0*z               # initial Ey
-Bx0 = lambda z : 0*z               # initial Bx
+Bx0 = lambda z : amp*np.sin(k*z)   # initial Bx
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
 jy0 = lambda z : 0*z               # initial jcy
@@ -67,12 +67,12 @@ jy0 = lambda z : 0*z               # initial jcy
 
 
 #===== numerical parameters =========================================================
-Lz = 327.7                         # length of z-domain
-Nel = 1800                         # number of elements z-direction
-T = 1000.                          # simulation time
-dt = 0.04                          # time step
+Lz = 2*np.pi/k                     # length of z-domain
+Nel = 32                           # number of elements z-direction
+T = 200.                           # simulation time
+dt = 0.05                          # time step
 p = 3                              # degree of B-spline basis functions in V0
-Np = np.int(5e6)                   # number of markers
+Np = np.int(1e5)                   # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
 #====================================================================================
@@ -237,7 +237,7 @@ timea = time.time()
 
 z_old[:] = particles[:, 0]
 
-utils_pic_fast.borisGemRel_bc_1(particles, -dt/2, qe, me, Lz, Tz, tz, p, Nbase_0, ex, ey, bx, by, B0z, c)
+utils_pic_fast.borisGem_bc_1(particles, -dt/2, qe, me, Lz, Tz, tz, p, Nbase_0, ex, ey, bx, by, B0z)
 
 particles[:, 0] = z_old
 particles[:, 4] = w0 - control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
@@ -251,7 +251,7 @@ print('time for particle push: ' + str(timeb - timea))
 #===== test timing for hot current computation ======================================
 timea = time.time()
 
-utils_pic_fast.hotCurrentRel_bc_1(particles[:, 0], particles[:, 1:], Tz, p, qe, jh, c, Nbase_0)
+utils_pic_fast.hotCurrent_bc_1(particles[:, 1:3], particles[:, 0], particles[:, 4], Tz, p, Nbase_0, qe, jh)
 
 timeb = time.time()
 print('time for hot current computation: ' + str(timeb - timea))
@@ -280,7 +280,7 @@ def update():
     
     
     # ... update particle velocities from n-1/2 to n+1/2 with fields at time n and positions from n to n+1 with velocities at n+1/2
-    utils_pic_fast.borisGemRel_bc_1(particles, dt, qe, me, Lz, Tz, tz, p, Nbase_0, ex, ey, bx, by, B0z, c)
+    utils_pic_fast.borisGem_bc_1(particles, dt, qe, me, Lz, Tz, tz, p, Nbase_0, ex, ey, bx, by, B0z)
     # ...
     
     
@@ -290,7 +290,7 @@ def update():
     
     
     # ... compute hot electron current densities
-    utils_pic_fast.hotCurrentRel_bc_1(1/2*(z_old + particles[:, 0]), particles[:, 1:], Tz, p, qe, jh, c, Nbase_0)
+    utils_pic_fast.hotCurrent_bc_1(particles[:, 1:3], 1/2*(z_old + particles[:, 0]), particles[:, 4], Tz, p, Nbase_0, qe, jh)
     # ...
      
     

@@ -14,15 +14,15 @@ import utilitis_pic
 #  calling epyccel
 #====================================================================================
 from pyccel.epyccel import epyccel
-utils_pic_fast = epyccel(utilitis_pic)
+utils_pic_fast = epyccel(utilitis_pic, accelerator='openmp')
 print('pyccelization of pic functions done!')
 #====================================================================================
 
 
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
-save = 0
-title = 'test.txt' 
+save = 1
+title = 'test_maxgrowth.txt' 
 #====================================================================================
 
 
@@ -69,12 +69,12 @@ jy0 = lambda z : 0*z               # initial jcy
 #===== numerical parameters =========================================================
 Lz = 327.7                         # length of z-domain
 Nel = 2200                         # number of elements z-direction
-T = 1000                           # simulation time
+T = 1000.                          # simulation time
 dt = 0.04                          # time step
 p = 3                              # degree of B-spline basis functions
 Np = np.int(5e6)                   # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
-time_integr = 0                    # do time integration? (1 : yes, 0: no)
+time_integr = 1                    # do time integration? (1 : yes, 0: no)
 #====================================================================================
 
 

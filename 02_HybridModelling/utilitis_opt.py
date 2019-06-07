@@ -842,8 +842,11 @@ def solveDispersionHybridExplicit(k, pol, c, wce, wpe, wpar, wperp, nuh, initial
     Returns
     -------
     
-    w : complex
-        solution (frequency) of dispersion realation
+    wr : double
+        real frequency of dispersion realation
+        
+    wi : double
+        growth rate
         
     counter : int
         number of needed iterations
@@ -871,6 +874,107 @@ def solveDispersionHybridExplicit(k, pol, c, wce, wpe, wpar, wperp, nuh, initial
     vR = (wr + pol*wce)/k
 
     wi = 1/(2*wr - pol*wpe**2*wce/(wr + pol*wce)**2)*np.sqrt(2*np.pi)*wpe**2*nuh*vR/wpar*np.exp(-vR**2/(2*wpar**2))*(wr/(2*(-pol*wce - wr)) + 1/2*(1 - wperp**2/wpar**2))
+
+    return wr, wi, counter
+
+
+#===============================================================================================================
+def solveDispersionHybridRelativistic(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it=100):
+    """
+    Solves the relativistic hybrid dispersion relation numerically using Newton's method for a fixed wavenumber k.
+    
+    Parameters
+    ----------
+    k : double
+        wavenumber
+        
+    pol : int
+        wave polarization (+1 : R-wave, -1: L-wave)
+        
+    c : double
+        the speed of light
+        
+    wce : double
+        electron cyclotron frequency
+        
+    wpe : double
+        cold electron plasma frequency
+        
+    wpar : double
+        parallel thermal velocity of energetic electrons
+        
+    wperp : double
+        perpendicular thermal velocity of energetic electrons
+        
+    nuh : double
+        ratio between cold and energetic electron number densities
+        
+    initial_guess : complex
+        initial guess of solution for initialization of Newton's method
+        
+    tol : double
+        tolerance when to stop Newton interation (difference between two successive interations)
+        
+    max_it : int
+        maximum number of iterations
+        
+    Returns
+    -------
+    
+    wr : double
+        real frequency of dispersion realation
+        
+    wi : double
+        growth rate
+        
+    counter : int
+        number of needed iterations
+    """
+    
+    import scipy.integrate as integrate
+
+    def Dcold(k, w, pol):
+        return 1 - k**2*c**2/w**2 - wpe**2/(w*(w + pol*wce))
+
+    def Dcoldprime(k, w, pol):
+        return 2*k**2/w**3 + wpe**2*(2*w + pol*wce)/(w**2*(w + pol*wce)**2)
+    
+    def gamma(p_perp, k, om):
+        return (-1 + (c*k/om)*(((c*k/om)**2 - 1)*(1 + p_perp**2/c**2)*(om/np.abs(wce))**2 + 1)**(1/2))/(((c*k/om)**2 - 1)*(om/np.abs(wce)))
+
+    def pR(p_perp, k, om):
+        return (gamma(p_perp, k, om)*om - np.abs(wce))/k
+
+    def DeltaR(p_perp, k, om):
+        return 1 - om*pR(p_perp, k, om)/(c**2*gamma(p_perp, k, om)*k)
+
+    def integrand_eta(p_perp, k, om):
+        return np.pi*nuh*(om - np.abs(wce))/k*(p_perp**2/DeltaR(p_perp, k, om))*(-p_perp/wperp**2)*1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-pR(p_perp, k, om)**2/(2*wpar**2) - p_perp**2/(2*wperp**2))
+
+    def integrand_A1(p_perp, k, om):
+        return k/(om - np.abs(wce))*p_perp**2/(DeltaR(p_perp, k, om)*gamma(p_perp, k, om))*1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-pR(p_perp, k, om)**2/(2*wpar**2) - p_perp**2/(2*wperp**2))*(pR(p_perp, k, om)*(p_perp/wperp**2) - p_perp*pR(p_perp, k, om)/wpar**2)
+
+    def integrand_A2(p_perp, k, om):
+        return p_perp**2/DeltaR(p_perp, k, om)*1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-pR(p_perp, k, om)**2/(2*wpar**2) - p_perp**2/(2*wperp**2))*(-p_perp/wperp**2)
+
+    wr = initial_guess
+    counter = 0
+
+    while True:
+        wnew = wr - Dcold(k, wr, pol)/Dcoldprime(k, wr, pol)
+
+        if np.abs(wnew - wr) < tol or counter == max_it:
+            wr = wnew
+            break
+
+        wr = wnew
+        counter += 1
+
+    i1 = integrate.quad(integrand_eta, 0., np.inf, args=(k, wr))[0]
+    i2 = integrate.quad(integrand_A1, 0., np.inf, args=(k, wr))[0]
+    i3 = integrate.quad(integrand_A2, 0., np.inf, args=(k, wr))[0]
+    
+    wi = np.pi*wpe**2*i1/(2*wr + wpe**2*np.abs(wce)/(wr - np.abs(wce))**2)*(i2/i3 - wr/(np.abs(wce) - wr))
 
     return wr, wi, counter
 

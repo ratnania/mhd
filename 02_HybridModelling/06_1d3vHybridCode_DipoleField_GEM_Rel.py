@@ -7,7 +7,7 @@ import psydac.core.interface as inter
 import time
 
 import utilitis_opt as utils_opt
-import utilitis_pic
+import utilitis_pic_Rel
 
 
 #====================================================================================
@@ -21,8 +21,8 @@ print('pyccelization of pic functions done!')
 
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
-save = 0
-title = 'test.txt' 
+save = 1
+title = 'test_dipoleRel_NoCV.txt' 
 #====================================================================================
 
 
@@ -41,13 +41,13 @@ qe = -1.0                          # electron charge
 me = 1.0                           # electron mass
 B0z = 1.0                          # minimum of background magnetic field in z-direction
 wce = qe*B0z/me                    # electron cyclotron frequency
-wpe = 2*np.abs(wce)                # cold electron plasma frequency
-nuh = 2e-3                         # ratio of cold/hot electron densities (nh/nc)
+wpe = 5*np.abs(wce)                # cold electron plasma frequency
+nuh = 6e-3                         # ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # hot electron density
-wpar = 0.1*c                       # parallel thermal velocity of energetic particles
-wperp = 0.1*c                      # perpendicular thermal velocity of energetic particles
+wpar = 0.2*c                       # parallel thermal velocity of energetic particles
+wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
 
-xi = 0.                            # inhomogeneity factor of background magnetic field
+xi = 8.62e-5                       # inhomogeneity factor of background magnetic field
 
 bcs_d = 1                          # damping of wave fields at boundaries? (1: yes, 0: no)
 bcs_g = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
@@ -72,14 +72,14 @@ jy0 = lambda z : 0*z               # initial jcy
 
 
 #===== numerical parameters =========================================================
-Lz = 80.                           # length of z-domain
-Nel = 512                          # number of elements z-direction
-T = 300                            # simulation time
-dt = 0.05                          # time step
+Lz = 327.7                         # length of z-domain
+Nel = 2000                         # number of elements z-direction
+T = 5000.                          # simulation time
+dt = 0.04                          # time step
 p = 3                              # degree of B-spline basis functions in V0
-Np = np.int(1e5)                   # number of markers
-control = 1                        # control variate for noise reduction? (1: yes, 0: no)
-time_integr = 0                    # do time integration? (1 : yes, 0: no)
+Np = np.int(6e6)                   # number of markers
+control = 0                        # control variate for noise reduction? (1: yes, 0: no)
+time_integr = 1                    # do time integration? (1 : yes, 0: no)
 
 Ld = 0.05*Lz                       # length of damping region at each end
 #====================================================================================
@@ -170,7 +170,7 @@ def fh0(z, vx, vy, vz):
 
 
 #===== Maxwellian for control variate ===============================================
-maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
+maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + 
 #====================================================================================
 
 
@@ -202,6 +202,11 @@ M1 = utils_opt.matrixAssembly_V1(p, Nbase0, Tz, False)
 Mb = utils_opt.matrixAssembly_backgroundField(p, Nbase0, Tz, False, B_background_z)
 
 G = utils_opt.GRAD_1d(p, Nbase0, False)
+
+D = inter.collocation_matrix(p - 1, Nbase0 - 1, tz, np.array([Lz/2 - 25.0]))
+
+for j in range(Nbase0 - 1):
+    D[:, j] = p*D[:, j]/(tz[j + p] - tz[j])
 
 print('matrix assembly done!')
 #====================================================================================
@@ -387,7 +392,7 @@ def update():
 #===== create data file and save parameters (first row), initial fields and energies (second row)
 if save == 1:
     file = open(title, 'ab')
-    np.savetxt(file, np.reshape(pa, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+    #np.savetxt(file, np.reshape(pa, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
 
 
 en_E = np.append(en_E, eps0/2*(np.dot(ex[1:-1], np.dot(M0, ex[1:-1])) + np.dot(ey[1:-1], np.dot(M0, ey[1:-1]))))
@@ -395,11 +400,14 @@ en_B = np.append(en_B, eps0/(2*mu0)*(np.dot(bx, np.dot(M1, bx)) + np.dot(by, np.
 en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
 en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
-bx_save = np.copy(bx)
+Bx_save = np.dot(bx, D.flatten())
 
 if save == 1:
-    data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], 0.]))
-    np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+    #data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], 0.]))
+    #np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+    
+    data = np.append(Bx_save, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], 0.]))
+    np.savetxt(file, np.reshape(data, (1, 6)), fmt = '%1.10e')
 #====================================================================================
 
 
@@ -431,11 +439,14 @@ if time_integr == 1:
                 en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
                 en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
-                bx_save = np.vstack((bx_save, np.copy(bx)))
+                Bx_save = np.dot(bx, D.flatten())
                 
                 if save == 1:
-                    data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))
-                    np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+                    #data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))
+                    #np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+                    
+                    data = np.append(Bx_save, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))
+                    np.savetxt(file, np.reshape(data, (1, 6)), fmt = '%1.10e')
                 # ...
 
             time_step += 1
