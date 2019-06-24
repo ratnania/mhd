@@ -1,7 +1,7 @@
 import numpy as np
+import psydac.core.interface as inter
 import scipy.sparse as sparse
 import scipy.special as sp
-import bsplines as bsp
 
 
 #===============================================================================================================
@@ -33,14 +33,14 @@ def matrixAssembly_V0(p, Nbase, T, bc):
     """
     
     
-    el_b = bsp.breakpoints(T, p)
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
     ne = len(el_b) - 1
 
     pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
-    pts, wts = bsp.quadrature_grid(el_b, pts_loc, wts_loc)
+    pts, wts = inter.construct_quadrature_grid(ne, p + 1, pts_loc, wts_loc, el_b)
 
     d = 1
-    basis = bsp.basis_ders_on_quad_grid(T, p, pts, d)
+    basis = inter.eval_on_grid_splines_ders(p, Nbase, p + 1, d, T, pts)
 
     M = np.zeros((Nbase, Nbase))
     C = np.zeros((Nbase, Nbase))
@@ -55,8 +55,8 @@ def matrixAssembly_V0(p, Nbase, T, bc):
                 value_c = 0.
 
                 for g in range(p + 1):
-                    value_m += wts[ie, g]*basis[ie, il, 0, g]*basis[ie, jl, 0, g]
-                    value_c += wts[ie, g]*basis[ie, il, 0, g]*basis[ie, jl, 1, g]
+                    value_m += wts[g, ie]*basis[il, 0, g, ie]*basis[jl, 0, g, ie]
+                    value_c += wts[g, ie]*basis[il, 0, g, ie]*basis[jl, 1, g, ie]
 
                 M[i, j] += value_m
                 C[i, j] += value_c
@@ -76,7 +76,6 @@ def matrixAssembly_V0(p, Nbase, T, bc):
         
                                
     return M, C
-
 
 
 #===============================================================================================================
@@ -106,14 +105,14 @@ def matrixAssembly_V1(p, Nbase, T, bc):
     
     t = T[1:-1]
     
-    el_b = bsp.breakpoints(T, p)
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
     ne = len(el_b) - 1
 
-    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
-    pts, wts = bsp.quadrature_grid(el_b, pts_loc, wts_loc)
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p)
+    pts, wts = inter.construct_quadrature_grid(ne, p, pts_loc, wts_loc, el_b)
 
     d = 0
-    basis = bsp.basis_ders_on_quad_grid(t, p - 1, pts, d, normalize=True)
+    basis = inter.eval_on_grid_splines_ders(p - 1, Nbase - 1, p, d, t, pts)
 
     M = np.zeros((Nbase - 1, Nbase - 1))
 
@@ -125,10 +124,10 @@ def matrixAssembly_V1(p, Nbase, T, bc):
 
                 value_m = 0.
 
-                for g in range(p + 1):
-                    value_m += wts[ie, g]*basis[ie, il, 0, g]*basis[ie, jl, 0, g]
+                for g in range(p):
+                    value_m += wts[g, ie]*basis[il, 0, g, ie]*basis[jl, 0, g, ie]
 
-                M[i, j] += value_m
+                M[i, j] += p/(t[i + p] - t[i])*p/(t[j + p] - t[j])*value_m
                 
     if bc == True:
         M[:p - 1, :] += M[-p + 1:, :]
@@ -136,8 +135,6 @@ def matrixAssembly_V1(p, Nbase, T, bc):
         M = M[:M.shape[0] - p + 1, :M.shape[1] - p + 1]
                                
     return M
-
-
 
 
 #===============================================================================================================
@@ -168,14 +165,21 @@ def matrixAssembly_backgroundField(p, Nbase, T, bc, B_background_z):
         mass matrix in V0
     """
     
-    el_b = bsp.breakpoints(T, p)
+    if bc == True: 
+        bcon = 1
+        Nbase_0 = Nbase - p
+    else:
+        bcon = 0
+        Nbase_0 = Nbase
+    
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
     ne = len(el_b) - 1
 
     pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
-    pts, wts = bsp.quadrature_grid(el_b, pts_loc, wts_loc)
+    pts, wts = inter.construct_quadrature_grid(ne, p + 1, pts_loc, wts_loc, el_b)
 
     d = 0
-    basis = bsp.basis_ders_on_quad_grid(T, p, pts, d)
+    basis = inter.eval_on_grid_splines_ders(p, Nbase, p + 1, d, T, pts)
 
     D = np.zeros((Nbase, Nbase))
 
@@ -188,7 +192,7 @@ def matrixAssembly_backgroundField(p, Nbase, T, bc, B_background_z):
                 value_d = 0.
 
                 for g in range(p + 1):
-                    value_d += wts[ie, g]*basis[ie, il, 0, g]*basis[ie, jl, 0, g]*B_background_z(pts[ie, g])
+                    value_d += wts[g, ie]*basis[il, 0, g, ie]*basis[jl, 0, g, ie]*B_background_z(pts[g, ie])
 
                 D[i, j] += value_d
                 
@@ -232,14 +236,14 @@ def L2_prod_V0(fun, p, Nbase, T):
     """
     
     
-    el_b = bsp.breakpoints(T, p)
-    ne = len(el_b) - 1
-
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    ne = len(el_b) - 1 
+    
     pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
-    pts, wts = bsp.quadrature_grid(el_b, pts_loc, wts_loc)
-
+    pts, wts = inter.construct_quadrature_grid(ne, p + 1, pts_loc, wts_loc, el_b)
+    
     d = 0
-    basis = bsp.basis_ders_on_quad_grid(T, p, pts, d)
+    basis = inter.eval_on_grid_splines_ders(p, Nbase, p + 1, d, T, pts)
     
     f_int = np.zeros(Nbase)
     
@@ -249,7 +253,7 @@ def L2_prod_V0(fun, p, Nbase, T):
             
             value = 0.
             for g in range(p + 1):
-                value += wts[ie, g]*fun(pts[ie, g])*basis[ie, il, 0, g]
+                value += wts[g, ie]*fun(pts[g, ie])*basis[il, 0, g, ie]
                 
             f_int[i] += value
             
@@ -283,16 +287,16 @@ def L2_prod_V1(fun, p, Nbase, T):
         the result of the integration with each basis function
     """
     
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    ne = len(el_b) - 1 
+    
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
+    pts, wts = inter.construct_quadrature_grid(ne, p + 1, pts_loc, wts_loc, el_b)
+    
     t = T[1:-1]
     
-    el_b = bsp.breakpoints(T, p)
-    ne = len(el_b) - 1
-
-    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p + 1)
-    pts, wts = bsp.quadrature_grid(el_b, pts_loc, wts_loc)
-
     d = 0
-    basis = bsp.basis_ders_on_quad_grid(t, p - 1, pts, d, normalize=True)
+    basis = inter.eval_on_grid_splines_ders(p - 1, Nbase - 1, p + 1, d, t, pts)
     
     f_int = np.zeros(Nbase - 1)
     
@@ -302,12 +306,11 @@ def L2_prod_V1(fun, p, Nbase, T):
             
             value = 0.
             for g in range(p + 1):
-                value += wts[ie, g]*fun(pts[ie, g])*basis[ie, il, 0, g]
+                value += wts[g, ie]*fun(pts[g, ie])*basis[il, 0, g, ie]
                 
-            f_int[i] += value
+            f_int[i] += value*p/(t[i + p] - t[i])
             
     return f_int
-
 
 
 #===============================================================================================================
@@ -342,15 +345,17 @@ def evaluate_field_V0(vec, x, p, Nbase, T, bc):
     """
     
     if bc == True:
-        N = bsp.collocation_matrix(T, p, x, bc)
-              
+        N = inter.collocation_matrix(p, Nbase, T, x)
+        N[:, :p] += N[:, -p:]
+        N = sparse.csr_matrix(N[:, :N.shape[1] - p])
+        
     elif bc == False:
-        N = bsp.collocation_matrix(T, p, x, bc)[:, 1:-1]
+        N = sparse.csr_matrix(inter.collocation_matrix(p, Nbase, T, x)[:, 1:-1])
         
     else:    
-        N = bsp.collocation_matrix(T, p, x, False)
+        N = sparse.csr_matrix(inter.collocation_matrix(p, Nbase, T, x))
         
-    eva = np.dot(N, vec) 
+    eva = N.dot(vec) 
         
     return eva
 
@@ -390,14 +395,28 @@ def evaluate_field_V1(vec, x, p, Nbase, T, bc):
     t = T[1:-1]
     
     if bc == True:
-        D = bsp.collocation_matrix(t, p - 1, x, bc, normalize=True)
+        D = inter.collocation_matrix(p - 1, Nbase - 1, t, x)
+        
+        D[:, :(p - 1)] += D[:, -(p - 1):]
+        D = D[:, :D.shape[1] - (p - 1)]
+        
+        for j in range(Nbase - p):
+            D[:, j] = p*D[:, j]/(t[j + p] - t[j])
+            
+        D = sparse.csr_matrix(D)
         
     else:
-        D = bsp.collocation_matrix(t, p - 1, x, False, normalize=True)
+        D = inter.collocation_matrix(p - 1, Nbase - 1, t, x)
+        
+        for j in range(Nbase - 1):
+            D[:, j] = p*D[:, j]/(t[j + p] - t[j])
+            
+        D = sparse.csr_matrix(D)
     
     eva = D.dot(vec)
     
     return eva
+
 
 
 
@@ -449,45 +468,6 @@ def GRAD_1d(p, Nbase, bc):
             G = G[:, 1:-1]
 
         return G
-    
-    
-    
-#=============================================================================================================== 
-def integrate_1d(points, weights, fun):
-    """
-    Integrates the function 'fun' over the quadrature grid defined by (points, weights) in 1d.
-    
-    Parameters
-    ----------
-    points : 2d np.array
-        quadrature points in format (local point, element)
-        
-    weights : 2d np.array
-        quadrature weights in format (local point, element)
-    
-    fun : callable
-        1d function to be integrated
-        
-    Returns
-    -------
-    f_int : np.array
-        the value of the integration in each element
-    """
-    
-    n = points.shape[0]
-    k = points.shape[1]
-    
-    
-    f_int = np.zeros(n)
-    
-    for ie in range(n):
-        for g in range(k):
-            f_int[ie] += weights[ie, g]*fun(points[ie, g])
-        
-    return f_int
-
-
-
 
 #===============================================================================================================
 def histopolation_matrix_1d(p, Nbase, T, grev, bc):
@@ -517,132 +497,219 @@ def histopolation_matrix_1d(p, Nbase, T, grev, bc):
         histopolation matrix
     """
     
-    el_b = bsp.breakpoints(T, p)
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
     Nel = len(el_b) - 1
-    t = T[1:-1]
+    
     
     if bc == True:
-        
-        pts_loc, wts_loc = np.polynomial.legendre.leggauss(p - 1)
-        
-        ne = Nbase - p
-        D = np.zeros((ne, ne))
-        
         if p%2 != 0:
+            dx = el_b[-1]/Nel
+            ne = Nbase - 1
             
-            grid = el_b
+            pts_loc, wts_loc = np.polynomial.legendre.leggauss(p - 1)
+            pts, wts = inter.construct_quadrature_grid(ne, p - 1, pts_loc, wts_loc, grev)
+
+            col_quad = inter.collocation_matrix(p - 1, ne, T[1:-1], (pts%el_b[-1]).flatten())/dx
+
+            D = np.zeros((ne, ne))
             
-            pts, wts = bsp.quadrature_grid(grid, pts_loc, wts_loc)
-            col_quad = bsp.collocation_matrix(t, p - 1, pts.flatten(), bc, normalize=True)
-            
-            for ie in range(Nel):
-                for il in range(p):
-                    
-                    i = (ie + il)%ne
-                    
+            for i in range(ne):
+                for j in range(ne):
                     for k in range(p - 1):
-                        D[ie, i] += wts[ie, k]*col_quad[ie*(p - 1) + k, i]
+                        D[i, j] += wts[k, i]*col_quad[i + ne*k, j]
+
+            lower = int(np.ceil(p/2) - 1)
+            upper = -int(np.floor(p/2))
+
+            D[:, :(p - 1)] += D[:, -(p - 1):]
+            D = D[lower:upper, :D.shape[1] - (p - 1)]
 
             return D
         
         else:
+            dx = el_b[-1]/Nel
+            ne = Nbase - 1
             
-            grid = np.linspace(0., el_b[-1], 2*Nel + 1)
+            a = grev
+            b = grev + dx/2
+            c = np.vstack((a, b)).reshape((-1,), order = 'F')[:-1]
             
-            pts, wts = bsp.quadrature_grid(grid, pts_loc, wts_loc)
-            col_quad = bsp.collocation_matrix(t, p - 1, pts.flatten(), bc, normalize=True)
+            pts_loc, wts_loc = np.polynomial.legendre.leggauss(p - 1) 
+            pts, wts = inter.construct_quadrature_grid(2*ne, p - 1, pts_loc, wts_loc, c)
             
-            for iee in range(2*Nel):
-                for il in range(p):
-                    
-                    ie = int(iee/2)
-                    ie_grev = int(np.ceil(iee/2) - 1)
-                    
-                    i = (ie + il)%ne
-                    
+            col_quad = inter.collocation_matrix(p - 1, ne, T[1:-1], (pts%el_b[-1]).flatten())/dx
+            
+            D = np.zeros((ne, ne))
+            
+            for il in range(2*ne):
+                i = int(np.floor(il/2))
+                for j in range(ne):
                     for k in range(p - 1):
-                        D[ie_grev, i] += wts[iee, k]*col_quad[iee*(p - 1) + k, i]
+                        D[i, j] += wts[k, il]*col_quad[il + 2*ne*k, j] 
+                        
+            lower = int(np.ceil(p/2) - 1)
+            upper = -int(np.floor(p/2))
+
+            D[:, :(p - 1)] += D[:, -(p - 1):]
+            D = D[lower:upper, :D.shape[1] - (p - 1)]
 
             return D
         
     else:
-        
-        ng = len(grev)
-        
-        col_quad = bsp.collocation_matrix(T, p, grev, bc)
-        
-        D = np.zeros((ng - 1, Nbase - 1))
-        
-        for i in range(ng - 1):
-            for j in range(max(i - p + 1, 1), min(i + p + 3, Nbase)):
-                s = 0.
-                for k in range(j):
-                    s += col_quad[i, k] - col_quad[i + 1, k]
-                    
-                D[i, j - 1] = s
-                
-        return D
+        return inter.histopolation_matrix(p, Nbase, T, grev)
+
         
 
-
-class projectors_1d:
+#=============================================================================================================== 
+def integrate_1d(points, weights, fun):
+    """
+    Integrates the function 'fun' over the quadrature grid defined by (points, weights) in 1d.
     
-    def __init__(self, p, Nbase, T, bc):
+    Parameters
+    ----------
+    points : 2d np.array
+        quadrature points in format (local point, element)
         
-        self.p  = p
-        self.T  = T
-        self.bc = bc
+    weights : 2d np.array
+        quadrature weights in format (local point, element)
+    
+    fun : callable
+        1d function to be integrated
         
-        self.greville    = bsp.greville(T, p, bc)
-        self.breakpoints = bsp.breakpoints(T, p)
+    Returns
+    -------
+    f_int : np.array
+        the value of the integration in each element
+    """
+    
+    k = points.shape[0]
+    n = points.shape[1]
+    
+    f_int = np.zeros(n)
+    
+    for ie in range(n):
+        for g in range(k):
+            f_int[ie] += weights[g, ie]*fun(points[g, ie])
         
-        self.pts_loc, self.wts_loc = np.polynomial.legendre.leggauss(p)
-        
-        self.interpolation_V0 = bsp.collocation_matrix(T, p, self.greville, bc)  
-        self.histopolation_V1 = histopolation_matrix_1d(p, Nbase, T, self.greville, bc)
-        
-        
-        
-    def PI_0(self, fun):
-        
-        # Assemble vector of interpolation problem at greville points
-        rhs = fun(self.greville)
-        
-        # Solve interpolation problem
-        vec = np.linalg.solve(self.interpolation_V0, rhs)
-        
-        return vec
+    return f_int
+ 
     
     
+
+#===============================================================================================================        
+def PI_0_1d(fun, p, Nbase, T, bc):
+    """
+    Computes the FEM coefficient of the function 'fun' projected on the space V0.
     
-    def PI_1(self, fun):
+    Parameters
+    ----------
+    fun : callable
+        the function to be projected
         
-        # Compute quadrature grid for integration of right-hand-side
-        if self.bc == True:
-            if self.p%2 != 0:
-
-                grid = self.breakpoints
-                pts, wts = bsp.quadrature_grid(grid, self.pts_loc, self.wts_loc)
-
-            else:
-
-                grid = np.append(self.greville, self.greville[-1] + (self.greville[-1] - self.greville[-2])) 
-                pts, wts = bsp.quadrature_grid(grid, self.pts_loc, self.wts_loc)%self.breakpoints[-1]
-
-        else:
-
-            pts, wts = bsp.quadrature_grid(self.greville, self.pts_loc, self.wts_loc)
+    p : int
+        spline degree
+        
+    Nbase: int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
+    
+    vec : np.array
+        the FEM coefficients
+    """
+    
+    # compute greville points
+    grev = inter.compute_greville(p, Nbase, T)
+    
+    # assemble vector of interpolation problem at greville points
+    rhs = fun(grev)
+    
+    # assemble interpolation matrix
+    N = inter.collocation_matrix(p, Nbase, T, grev)       
+    
+    # apply boundary conditions
+    if bc == True:
+        lower =  int(np.floor(p/2))
+        upper = -int(np.ceil(p/2))
             
-        # Assemble vector of histopolation problem at greville points
-        rhs = integrate_1d(pts, wts, fun)
+        N[:, :p] += N[:, -p:]
+        N = N[lower:upper, :N.shape[1] - p]
         
-        # Solve histopolation problem
-        vec = np.linalg.solve(self.histopolation_V1, rhs)
+        rhs = rhs[lower:upper]
         
-        return vec   
+        
+    # solve interpolation problem
+    vec = np.linalg.solve(N, rhs)
     
+    return vec
+
+
+#===============================================================================================================
+def PI_1_1d(fun, p, Nbase, T, bc):
+    """
+    Computes the FEM coefficient of the function 'fun' projected on the space V1.
     
+    Parameters
+    ----------
+    fun : callable
+        the function to be projected
+        
+    p : int
+        spline degree
+        
+    Nbase : int
+        number of spline functions
+        
+    T : np.array
+        knot vector
+        
+    bc : boolean
+        boundary conditions (True = periodic, False = homogeneous Dirichlet, None = no boundary conditions)
+        
+    Returns
+    -------
     
+    vec : np.array
+        the FEM coefficients
+    """
+    
+    # compute greville points
+    grev = inter.compute_greville(p, Nbase, T)
+    
+    # compute quadrature grid
+    pts_loc, wts_loc = np.polynomial.legendre.leggauss(p)
+    pts, wts = inter.construct_quadrature_grid(Nbase - 1, p, pts_loc, wts_loc, grev)
+    
+    # compute element boundaries to get length of domain for periodic boundary conditions
+    el_b = inter.construct_grid_from_knots(p, Nbase, T)
+    
+    # assemble vector of histopolation problem at greville points
+    rhs = integrate_1d(pts%el_b[-1], wts, fun)
+    
+    # assemble histopolation matrix
+    D = histopolation_matrix_1d(p, Nbase, T, grev, bc)
+    
+    # apply boundary conditions
+    if bc == True:
+        lower = int(np.ceil(p/2) - 1)
+        upper = -int(np.floor(p/2))
+        
+        rhs = rhs[lower:upper]
+        
+    
+    # solve histopolation problem
+    vec = np.linalg.solve(D, rhs)
+    
+    return vec
+
+
 #===============================================================================================================
 def solveDispersionHybrid(k, pol, c, wce, wpe, wpar, wperp, nuh, initial_guess, tol, max_it=100):
     """

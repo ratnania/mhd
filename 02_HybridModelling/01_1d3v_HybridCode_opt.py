@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sc
 import matplotlib.pyplot as plt
 
-import psydac.core.interface as inter
+import bsplines as bsp
 
 import time
 
@@ -21,8 +21,8 @@ print('pyccelization of pic functions done!')
 
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
-save = 1
-title = 'test_maxgrowth.txt' 
+save = 0
+title = 'test.txt' 
 #====================================================================================
 
 
@@ -41,8 +41,8 @@ qe = -1.0                          # electron charge
 me = 1.0                           # electron mass
 B0z = 1.0                          # minimum of background magnetic field in z-direction
 wce = qe*B0z/me                    # electron cyclotron frequency
-wpe = 5*np.abs(wce)                # cold electron plasma frequency
-nuh = 6e-3                         # ratio of cold/hot electron densities (nh/nc)
+wpe = 2*np.abs(wce)                # cold electron plasma frequency
+nuh = 0.06                         # ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # hot electron density
 wpar = 0.2*c                       # parallel thermal velocity of energetic particles
 wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
@@ -58,7 +58,7 @@ eps = 0.                           # amplitude of spatial pertubation of initial
 
 Ex0 = lambda z : 0*z               # initial Ex
 Ey0 = lambda z : 0*z               # initial Ey
-Bx0 = lambda z : 0*z               # initial Bx
+Bx0 = lambda z : amp*np.sin(k*z)   # initial Bx
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
 jy0 = lambda z : 0*z               # initial jcy
@@ -67,12 +67,12 @@ jy0 = lambda z : 0*z               # initial jcy
 
 
 #===== numerical parameters =========================================================
-Lz = 327.7                         # length of z-domain
-Nel = 2200                         # number of elements z-direction
-T = 1000.                          # simulation time
-dt = 0.04                          # time step
+Lz = 2*np.pi/k                     # length of z-domain
+Nel = 32                           # number of elements z-direction
+T = 200.                           # simulation time
+dt = 0.05                          # time step
 p = 3                              # degree of B-spline basis functions
-Np = np.int(5e6)                   # number of markers
+Np = np.int(1e5)                   # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
 #====================================================================================
@@ -116,9 +116,9 @@ pa[22] = saving_step
 
 #===== discretization of spatial domain =============================================
 dz   = Lz/Nel                                # element size
-el_b = np.linspace(0, Lz, Nel + 1)           # element boundaries
+el_b = np.linspace(0., Lz, Nel + 1)          # element boundaries
 
-Nbase   = Nel + p                            # total number of basis function
+Nbase   = Nel + p                            # total number of basis functions
 Nbase_0 = Nel                                # number of degrees of freedom
 #====================================================================================
 
@@ -174,7 +174,7 @@ g_sampling = lambda vx, vy, vz : 1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**
 
 
 #===== spline knot vector, mass and advection matrix ================================
-Tz = inter.make_periodic_knots(p, Nbase)*Lz
+Tz = bsp.make_knots(el_b, p, True)
 M, C = utils_opt.matrixAssembly_V0(p, Nbase, Tz, True)
 
 print('matrix assembly done!')

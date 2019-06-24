@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sc
 import matplotlib.pyplot as plt
 
-import psydac.core.interface as inter
+import bsplines as bsp
 
 import time
 
@@ -22,7 +22,7 @@ print('pyccelization of pic functions done!')
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
 save = 1
-title = 'test_dipoleRel_NoCV.txt' 
+title = 'test_nopsydac.txt' 
 #====================================================================================
 
 
@@ -73,15 +73,15 @@ jy0 = lambda z : 0*z               # initial jcy
 
 #===== numerical parameters =========================================================
 Lz = 327.7                         # length of z-domain
-Nel = 2000                         # number of elements z-direction
+Nel = 1600                         # number of elements z-direction
 T = 5000.                          # simulation time
 dt = 0.04                          # time step
 p = 3                              # degree of B-spline basis functions in V0
-Np = np.int(6e6)                   # number of markers
-control = 0                        # control variate for noise reduction? (1: yes, 0: no)
+Np = np.int(2e6)                   # number of markers
+control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
 
-Ld = 0.05*Lz                       # length of damping region at each end
+Ld = 0.046*Lz                      # length of damping region at each end
 #====================================================================================
 
 
@@ -170,7 +170,7 @@ def fh0(z, vx, vy, vz):
 
 
 #===== Maxwellian for control variate ===============================================
-maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + 
+maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
 #====================================================================================
 
 
@@ -194,7 +194,7 @@ def damp(z):
 
 
 #===== spline knot vector, global mass matrices (in V0 and V1) and gradient matrix ==
-Tz = inter.make_open_knots(p, Nbase0)*Lz
+Tz = bsp.make_knots(el_b, p, False)
 tz = Tz[1:-1]
 
 M0, C0 = utils_opt.matrixAssembly_V0(p, Nbase0, Tz, False)
@@ -203,10 +203,7 @@ Mb = utils_opt.matrixAssembly_backgroundField(p, Nbase0, Tz, False, B_background
 
 G = utils_opt.GRAD_1d(p, Nbase0, False)
 
-D = inter.collocation_matrix(p - 1, Nbase0 - 1, tz, np.array([Lz/2 - 25.0]))
-
-for j in range(Nbase0 - 1):
-    D[:, j] = p*D[:, j]/(tz[j + p] - tz[j])
+D = bsp.collocation_matrix(tz, p - 1, np.array([Lz/2 - 25.0]), False, normalize=True)
 
 print('matrix assembly done!')
 #====================================================================================
@@ -229,17 +226,20 @@ z_old = np.empty(Np)
 
 
 #===== initial coefficients with commuting projectors ===============================
-ex[:] = utils_opt.PI_0_1d(Ex0, p, Nbase0, Tz, False)
-ey[:] = utils_opt.PI_0_1d(Ey0, p, Nbase0, Tz, False)
-bx[:] = utils_opt.PI_1_1d(Bx0, p, Nbase0, Tz, False)
-by[:] = utils_opt.PI_1_1d(By0, p, Nbase0, Tz, False)
-yx[:] = utils_opt.PI_0_1d(jx0, p, Nbase0, Tz, False)
-yy[:] = utils_opt.PI_0_1d(jy0, p, Nbase0, Tz, False)
+proj = utils_opt.projectors_1d(p, Nbase0, Tz, False)
+
+ex[:] = proj.PI_0(Ex0)
+ey[:] = proj.PI_0(Ey0)
+bx[:] = proj.PI_1(Bx0)
+by[:] = proj.PI_1(By0)
+yx[:] = proj.PI_0(jx0)
+yy[:] = proj.PI_0(jy0)
 
 uj[:] = np.concatenate((ex[1:-1], ey[1:-1], bx, by, yx[1:-1], yy[1:-1]))
 
 print('projection of initial fields done!')
 #====================================================================================
+
 
 
 
@@ -267,8 +267,8 @@ print('LU factorization done!')
 
 
 if bcs_d == 1:
-    grev = inter.compute_greville(p, Nbase0, Tz)
-    coll = inter.collocation_matrix(p, Nbase0, Tz, grev)[1:-1, 1:-1]
+    grev = bsp.greville(Tz, p, False)
+    coll = bsp.collocation_matrix(Tz, p, grev, False)[1:-1, 1:-1]
     gi = np.zeros(Nbase0)
 
     for i in range(Nbase0):
@@ -400,6 +400,7 @@ en_B = np.append(en_B, eps0/(2*mu0)*(np.dot(bx, np.dot(M1, bx)) + np.dot(by, np.
 en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
 en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
+#bx_save = np.copy(bx)
 Bx_save = np.dot(bx, D.flatten())
 
 if save == 1:
@@ -439,7 +440,9 @@ if time_integr == 1:
                 en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
                 en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
+                #bx_save = np.vstack((bx_save, np.copy(bx)))
                 Bx_save = np.dot(bx, D.flatten())
+
                 
                 if save == 1:
                     #data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))

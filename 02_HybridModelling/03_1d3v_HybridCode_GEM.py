@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sc
 import matplotlib.pyplot as plt
 
-import psydac.core.interface as inter
+import bsplines as bsp
 
 import time
 
@@ -21,8 +21,8 @@ print('pyccelization of pic functions done!')
 
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
-save = 1
-title = 'test_growth.txt' 
+save = 0
+title = 'test.txt' 
 #====================================================================================
 
 
@@ -42,7 +42,7 @@ me = 1.0                           # electron mass
 B0z = 1.0                          # minimum of background magnetic field in z-direction
 wce = qe*B0z/me                    # electron cyclotron frequency
 wpe = 2*np.abs(wce)                # cold electron plasma frequency
-nuh = 6e-2                         # ratio of cold/hot electron densities (nh/nc)
+nuh = 0.06                         # ratio of cold/hot electron densities (nh/nc)
 nh = nuh*wpe**2                    # hot electron density
 wpar = 0.2*c                       # parallel thermal velocity of energetic particles
 wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
@@ -69,7 +69,7 @@ jy0 = lambda z : 0*z               # initial jcy
 #===== numerical parameters =========================================================
 Lz = 2*np.pi/k                     # length of z-domain
 Nel = 32                           # number of elements z-direction
-T = 200.                           # simulation time
+T = 200                            # simulation time
 dt = 0.05                          # time step
 p = 3                              # degree of B-spline basis functions in V0
 Np = np.int(1e5)                   # number of markers
@@ -152,7 +152,7 @@ g_sampling = lambda vx, vy, vz : 1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**
 
 
 #===== spline knot vector, global mass matrices (in V0 and V1) and gradient matrix ==
-Tz = inter.make_periodic_knots(p, Nbase)*Lz
+Tz = bsp.make_knots(el_b, p, True)
 tz = Tz[1:-1]
 
 M0, C0 = utils_opt.matrixAssembly_V0(p, Nbase, Tz, True)
@@ -179,12 +179,14 @@ z_old = np.empty(Np)
 
 
 #===== initial coefficients with commuting projectors ===============================
-ex[:] = utils_opt.PI_0_1d(Ex0, p, Nbase, Tz, True)
-ey[:] = utils_opt.PI_0_1d(Ey0, p, Nbase, Tz, True)
-bx[:] = utils_opt.PI_1_1d(Bx0, p, Nbase, Tz, True)
-by[:] = utils_opt.PI_1_1d(By0, p, Nbase, Tz, True)
-yx[:] = utils_opt.PI_0_1d(jx0, p, Nbase, Tz, True)
-yy[:] = utils_opt.PI_0_1d(jy0, p, Nbase, Tz, True)
+proj = utils_opt.projectors_1d(p, Nbase, Tz, True)
+
+ex[:] = proj.PI_0(Ex0)
+ey[:] = proj.PI_0(Ey0)
+bx[:] = proj.PI_1(Bx0)
+by[:] = proj.PI_1(By0)
+yx[:] = proj.PI_0(jx0)
+yy[:] = proj.PI_0(jy0)
 
 uj = np.concatenate((ex, ey, bx, by, yx, yy))
 
