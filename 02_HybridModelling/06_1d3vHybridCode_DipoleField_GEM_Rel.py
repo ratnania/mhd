@@ -1,6 +1,6 @@
 import numpy as np
 import scipy as sc
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 import bsplines as bsp
 
@@ -15,6 +15,7 @@ import utilitis_pic_Rel
 #====================================================================================
 from pyccel.epyccel import epyccel
 utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
+#utils_pic_fast = epyccel(utilitis_pic_Rel)
 print('pyccelization of pic functions done!')
 #====================================================================================
 
@@ -22,7 +23,7 @@ print('pyccelization of pic functions done!')
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
 save = 1
-title = 'test_nopsydac.txt' 
+title = 'test_firstrun.txt' 
 #====================================================================================
 
 
@@ -73,11 +74,11 @@ jy0 = lambda z : 0*z               # initial jcy
 
 #===== numerical parameters =========================================================
 Lz = 327.7                         # length of z-domain
-Nel = 1600                         # number of elements z-direction
-T = 5000.                          # simulation time
+Nel = 2000                         # number of elements z-direction
+T = 1000.                          # simulation time
 dt = 0.04                          # time step
 p = 3                              # degree of B-spline basis functions in V0
-Np = np.int(2e6)                   # number of markers
+Np = np.int(5e6)                   # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
 
