@@ -1,13 +1,17 @@
+import time
+start = time.time()
+
+
 import numpy as np
 import scipy as sc
-#import matplotlib.pyplot as plt
 
-import bsplines as bsp
-
-import time
-
+import bsplines     as bsp
 import utilitis_opt as utils_opt
 import utilitis_pic_Rel
+
+
+
+
 
 
 #====================================================================================
@@ -16,39 +20,51 @@ import utilitis_pic_Rel
 from pyccel.epyccel import epyccel
 utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
 #utils_pic_fast = epyccel(utilitis_pic_Rel)
+
 print('pyccelization of pic functions done!')
 #====================================================================================
 
 
 
-#===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
-save = 1
-title = 'test_firstrun.txt' 
+
+
+#===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
+restart            = 1
+max_time           = 2.            # maximum runtime in minutes
+time_restart_files = 1.            # time after which the current configuration is saved
+
+name_particles     = 'restart_files/particles2.npy'
+name_fields        = 'restart_files/fields2.npy'
+name_time_step     = 'restart_files/time_step2.npy'
+name_control       = 'restart_files/control_variate2.npy'
 #====================================================================================
 
 
 
-#===== save only every saving_step-th time step =====================================
-saving_step = 1
+#===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
+save        = 1
+title       = 'test_restart.txt' 
+saving_step = 1                    # save data only every saving_stepth time step
+time_integr = 1                    # do time integration? (1 : yes, 0: no)
 #====================================================================================
 
 
 
 #===== physical parameters ==========================================================
-eps0 = 1.0                         # vacuum permittivity
-mu0 = 1.0                          # vacuum permeability
-c = 1.0                            # speed of light
-qe = -1.0                          # electron charge
-me = 1.0                           # electron mass
-B0z = 1.0                          # minimum of background magnetic field in z-direction
-wce = qe*B0z/me                    # electron cyclotron frequency
-wpe = 5*np.abs(wce)                # cold electron plasma frequency
-nuh = 6e-3                         # ratio of cold/hot electron densities (nh/nc)
-nh = nuh*wpe**2                    # hot electron density
-wpar = 0.2*c                       # parallel thermal velocity of energetic particles
+eps0  = 1.0                        # vacuum permittivity
+mu0   = 1.0                        # vacuum permeability
+c     = 1.0                        # speed of light
+qe    = -1.0                       # electron charge
+me    = 1.0                        # electron mass
+B0z   = 1.0                        # minimum of background magnetic field in z-direction
+wce   = qe*B0z/me                  # electron cyclotron frequency
+wpe   = 5*np.abs(wce)              # cold electron plasma frequency
+nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
+nh    = nuh*wpe**2                 # hot electron density
+wpar  = 0.2*c                      # parallel thermal velocity of energetic particles
 wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
 
-xi = 8.62e-5                       # inhomogeneity factor of background magnetic field
+xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
 
 bcs_d = 1                          # damping of wave fields at boundaries? (1: yes, 0: no)
 bcs_g = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
@@ -57,7 +73,7 @@ bcs_g = 1                          # field line dependence of initial distributi
 
 
 #===== initial conditions ===========================================================
-k = 2.                             # wavenumber of initial wave field perturbations
+k   = 2.                           # wavenumber of initial wave field perturbations
 amp = 1e-4                         # amplitude of initial wave field perturbations
 eps = 0.                           # amplitude of spatial pertubation of initial distribution function 
 
@@ -73,23 +89,22 @@ jy0 = lambda z : 0*z               # initial jcy
 
 
 #===== numerical parameters =========================================================
-Lz = 327.7                         # length of z-domain
-Nel = 2000                         # number of elements z-direction
-T = 1000.                          # simulation time
-dt = 0.04                          # time step
-p = 3                              # degree of B-spline basis functions in V0
-Np = np.int(5e6)                   # number of markers
+Lz      = 327.7                    # length of z-domain
+Nel     = 200                      # number of elements z-direction
+T       = 1000.                    # simulation time
+dt      = 0.04                     # time step
+p       = 3                        # degree of B-spline basis functions in V0
+Np      = np.int(5e4)              # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
-time_integr = 1                    # do time integration? (1 : yes, 0: no)
 
-Ld = 0.046*Lz                      # length of damping region at each end
+Ld      = 0.046*Lz                 # length of damping region at each end
 #====================================================================================
 
 
-
-
-
-
+#===== evaluation points for the magnetic field======================================
+#eva_points_Bx = np.linspace(40., 280., 7)
+eva_points_Bx = np.array([100., 200., 300.])
+#====================================================================================
 
 
 
@@ -204,7 +219,7 @@ Mb = utils_opt.matrixAssembly_backgroundField(p, Nbase0, Tz, False, B_background
 
 G = utils_opt.GRAD_1d(p, Nbase0, False)
 
-D = bsp.collocation_matrix(tz, p - 1, np.array([Lz/2 - 25.0]), False, normalize=True)
+D = bsp.collocation_matrix(tz, p - 1, eva_points_Bx, False, normalize=True)
 
 print('matrix assembly done!')
 #====================================================================================
@@ -390,27 +405,46 @@ def update():
 
 
 
-#===== create data file and save parameters (first row), initial fields and energies (second row)
-if save == 1:
-    file = open(title, 'ab')
-    #np.savetxt(file, np.reshape(pa, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
 
 
-en_E = np.append(en_E, eps0/2*(np.dot(ex[1:-1], np.dot(M0, ex[1:-1])) + np.dot(ey[1:-1], np.dot(M0, ey[1:-1]))))
-en_B = np.append(en_B, eps0/(2*mu0)*(np.dot(bx, np.dot(M1, bx)) + np.dot(by, np.dot(M1, by))))
-en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
-en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
-#bx_save = np.copy(bx)
-Bx_save = np.dot(bx, D.flatten())
+if restart == 0:
+    #===== create data file and save initial fields and energies ====================
+    if save == 1:
+        file = open(title, 'ab')
 
-if save == 1:
-    #data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], 0.]))
-    #np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
+    en_E = eps0/2 * (ex[1:-1].dot(M0.dot(ex[1:-1])) + ey[1:-1].dot(M0.dot(ey[1:-1])))
+    en_B = 1/(2*mu0) * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
+    en_C = 1/(2*eps0*wpe**2) * (yx[1:-1].dot(M0.dot(yx[1:-1])) + yy[1:-1].dot(M0.dot(yy[1:-1])))
+    en_H = me/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
+
+    Bx_save = D.dot(bx)
+
+    if save == 1:
+        data = np.append(Bx_save, np.array([en_E, en_B, en_C, en_H, 0.]))
+        np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+    #==================================================================================
+else:
+    #===== load restart data ==========================================================
+    if save == 1:
+        file = open(title, 'ab')
     
-    data = np.append(Bx_save, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], 0.]))
-    np.savetxt(file, np.reshape(data, (1, 6)), fmt = '%1.10e')
-#====================================================================================
+    particles[:] = np.load(name_particles)
+    uj[:]        = np.load(name_fields)
+    w0           = np.load(name_control)[0]
+    g0           = np.load(name_control)[1]
+    
+    ex[:] = np.array([0] + list(uj[:Nbase0_0]) + [0])
+    ey[:] = np.array([0] + list(uj[Nbase0_0:2*Nbase0_0]) + [0])
+    bx[:] = uj[2*Nbase0_0:2*Nbase0_0 + Nbase1_0]
+    by[:] = uj[2*Nbase0_0 + Nbase1_0:2*Nbase0_0 + 2*Nbase1_0]
+    yx[:] = np.array([0] + list(uj[2*Nbase0_0 + 2*Nbase1_0:3*Nbase0_0 + 2*Nbase1_0]) + [0])
+    yy[:] = np.array([0] + list(uj[3*Nbase0_0 + 2*Nbase1_0:4*Nbase0_0 + 2*Nbase1_0]) + [0])
+    
+    time_step, counter = np.load(name_time_step)
+    #==================================================================================
+
+
 
 
 
@@ -418,42 +452,62 @@ if save == 1:
 if time_integr == 1:
 
     print('start time integration! (number of time steps : ' + str(int(T/dt)) + ')')
-    time_step = 0
+    
+    last_time = time.time()
+    
+    if restart == 0:
+        time_step = 0
+        counter   = 1
 
     while True:
 
         try:
-            if time_step*dt >= T:
+            if (time_step*dt >= T) or ((time.time() - start)/60 > max_time):
+                
                 if save == 1:
                     file.close()
+                    
+                np.save('restart_files/particles' + str(counter), particles)
+                np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
+                np.save('restart_files/fields'    + str(counter), uj)
+                np.save('restart_files/time_step' + str(counter), np.array([time_step, counter]))
+                
                 break
 
             if time_step%50 == 0:
                 print('time steps finished: ' + str(time_step))
 
+            
+            if (time.time() - last_time)/60 > time_restart_files:
+                
+                np.save('restart_files/particles' + str(counter), particles)
+                np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
+                np.save('restart_files/fields'    + str(counter), uj)
+                np.save('restart_files/time_step' + str(counter), np.array([time_step, counter]))
+                
+                last_time = time.time()
+                counter += 1
+                
             update()
 
             if time_step%saving_step == 0:
 
-                # ... add data to file
-                en_E = np.append(en_E, eps0/2*(np.dot(ex[1:-1], np.dot(M0, ex[1:-1])) + np.dot(ey[1:-1], np.dot(M0, ey[1:-1]))))
-                en_B = np.append(en_B, eps0/(2*mu0)*(np.dot(bx, np.dot(M1, bx)) + np.dot(by, np.dot(M1, by))))
-                en_C = np.append(en_C, 1/(2*eps0*wpe**2)*(np.dot(yx[1:-1], np.dot(M0, yx[1:-1])) + np.dot(yy[1:-1], np.dot(M0, yy[1:-1]))))
-                en_H = np.append(en_H, me/(2*Np)*np.dot(particles[:, 4], particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
+                #================================= add data to file ===================================================
+                en_E = eps0/2 * (ex[1:-1].dot(M0.dot(ex[1:-1])) + ey[1:-1].dot(M0.dot(ey[1:-1])))
+                en_B = 1/(2*mu0) * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
+                en_C = 1/(2*eps0*wpe**2) * (yx[1:-1].dot(M0.dot(yx[1:-1])) + yy[1:-1].dot(M0.dot(yy[1:-1])))
+                en_H = me/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
 
-                #bx_save = np.vstack((bx_save, np.copy(bx)))
-                Bx_save = np.dot(bx, D.flatten())
+                Bx_save = D.dot(bx)
 
                 
                 if save == 1:
-                    #data = np.append(bx, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))
-                    #np.savetxt(file, np.reshape(data, (1, 1*Nbase1_0 + 5)), fmt = '%1.10e')
-                    
-                    data = np.append(Bx_save, np.array([en_E[-1], en_B[-1], en_C[-1], en_H[-1], (time_step + 1)*dt]))
-                    np.savetxt(file, np.reshape(data, (1, 6)), fmt = '%1.10e')
-                # ...
+                    data = np.append(Bx_save, np.array([en_E, en_B, en_C, en_H, (time_step + 1)*dt]))
+                    np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+                #=======================================================================================================
 
             time_step += 1
+        
         except KeyboardInterrupt:
             print('Pausing...  (Hit ENTER to continue, type quit to exit.)')
             
