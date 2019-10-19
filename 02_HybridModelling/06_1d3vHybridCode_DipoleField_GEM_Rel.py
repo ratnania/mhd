@@ -18,8 +18,8 @@ import utilitis_pic_Rel
 #  calling epyccel
 #====================================================================================
 from pyccel.epyccel import epyccel
-utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
-#utils_pic_fast = epyccel(utilitis_pic_Rel)
+#utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
+utils_pic_fast = epyccel(utilitis_pic_Rel)
 
 print('pyccelization of pic functions done!')
 #====================================================================================
@@ -30,13 +30,13 @@ print('pyccelization of pic functions done!')
 
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
 restart            = 1
-max_time           = 2.            # maximum runtime in minutes
-time_restart_files = 1.            # time after which the current configuration is saved
+max_time           = 1.             # maximum runtime in minutes
+time_restart_files = 0.3            # time after which the current configuration is saved in minutes
 
-name_particles     = 'restart_files/particles2.npy'
-name_fields        = 'restart_files/fields2.npy'
-name_time_step     = 'restart_files/time_step2.npy'
-name_control       = 'restart_files/control_variate2.npy'
+name_particles     = 'restart_files/particles1.npy'
+name_fields        = 'restart_files/fields1.npy'
+name_time_step     = 'restart_files/time_step1.npy'
+name_control       = 'restart_files/control_variate1.npy'
 #====================================================================================
 
 
@@ -467,10 +467,10 @@ if time_integr == 1:
                 if save == 1:
                     file.close()
                     
-                np.save('restart_files/particles' + str(counter), particles)
+                np.save('restart_files/particles'       + str(counter), particles)
                 np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
-                np.save('restart_files/fields'    + str(counter), uj)
-                np.save('restart_files/time_step' + str(counter), np.array([time_step, counter]))
+                np.save('restart_files/fields'          + str(counter), uj)
+                np.save('restart_files/time_step'       + str(counter), np.array([time_step, counter]))
                 
                 break
 
@@ -480,10 +480,10 @@ if time_integr == 1:
             
             if (time.time() - last_time)/60 > time_restart_files:
                 
-                np.save('restart_files/particles' + str(counter), particles)
+                np.save('restart_files/particles'       + str(counter), particles)
                 np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
-                np.save('restart_files/fields'    + str(counter), uj)
-                np.save('restart_files/time_step' + str(counter), np.array([time_step, counter]))
+                np.save('restart_files/fields'          + str(counter), uj)
+                np.save('restart_files/time_step'       + str(counter), np.array([time_step, counter]))
                 
                 last_time = time.time()
                 counter += 1
