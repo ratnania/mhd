@@ -13,6 +13,44 @@ def cross(a, b, r):
     r[2] = a[0]*b[1] - a[1]*b[0]
 
 
+    
+    
+    
+    
+#==============================================================================
+@pure
+@types('double[:]','int','double')
+def find_span(knots, degree, x):
+    
+    # Knot index at left/right boundary
+    low  = degree
+    high = 0
+    high = len(knots) - 1 - degree
+
+    # Check if point is exactly on left/right boundary, or outside domain
+    if x <= knots[low ]: 
+        returnVal = low
+    elif x >= knots[high]: 
+        returnVal = high - 1
+    else:
+        
+        # Perform binary search
+        span = (low + high)//2
+        
+        while x < knots[span] or x >= knots[span + 1]:
+            
+            if x < knots[span]:
+                high = span
+            else:
+                low  = span
+            span = (low + high)//2
+        
+        returnVal = span
+
+    return returnVal
+    
+    
+    
 
 #==============================================================================
 @types('double[:]','int','double','int','double[:]','double[:]','double[:]')
@@ -35,14 +73,12 @@ def basis_funs(knots, degree, x, span, left, right, values):
         values[j + 1] = saved
         
         
-        
-
 
 
 #==============================================================================
 @external_call
-@types('double[:,:](order=F)','double[:]','int','int[:]','double[:]','double[:]','int')
-def current(particles, knots, degree, spans, jh_x, jh_y, n_base):
+@types('double[:]','double[:,:](order=F)','double[:]','int','int[:]','double[:]','double[:]','int','int')
+def current(particles_pos, particles_v_w, knots, degree, spans, jh_x, jh_y, n_base, rel):
     
     jh_x[:] = 0.
     jh_y[:] = 0.
@@ -61,20 +97,23 @@ def current(particles, knots, degree, spans, jh_x, jh_y, n_base):
     # ...
     
     
-    np = len(particles[:, 0])
+    np = len(particles_pos)
     
     #$ omp parallel
     #$ omp do reduction ( + : jh_x, jh_y ) private ( ip, pos, span, left, right, values, ux, uy, uz, wp_over_gamma, il, i, bi )
     for ip in range(np):
-        pos  = particles[ip, 0]
+        pos  = particles_pos[ip]
         span = spans[ip]
         basis_funs(knots, degree, pos, span, left, right, values)
 
-        ux = particles[ip, 1]
-        uy = particles[ip, 2]
-        uz = particles[ip, 3]
-
-        wp_over_gamma = particles[ip, 4]/sqrt(1. + ux**2 + uy**2 + uz**2)
+        ux = particles_v_w[ip, 0]
+        uy = particles_v_w[ip, 1]
+        uz = particles_v_w[ip, 2]
+        
+        if rel == 1:
+            wp_over_gamma = particles_v_w[ip, 3]/sqrt(1. + ux**2 + uy**2 + uz**2)
+        else:
+            wp_over_gamma = particles_v_w[ip, 3]
 
         for il in range(degree + 1):
             i  = (span - il)%n_base
@@ -89,11 +128,138 @@ def current(particles, knots, degree, spans, jh_x, jh_y, n_base):
     ierr = 0
     
 
+    
+    
+    
+    
+    
+    
+    
+#==============================================================================
+@external_call
+@types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','int')
+def pusher_periodic(particles, dt, t0, t1, p0, spans_0, L, n_base, ex, ey, bx, by, pp_0, pp_1, rel):
+    
+    # ... needed for splines evaluation (in spaces V0 and V1)
+    from numpy import empty
+    from numpy import zeros
+    from numpy import sqrt
+    
+    p1 = p0 - 1
+
+    l0 = empty(p0,     dtype=float)
+    r0 = empty(p0,     dtype=float)
+    v0 = zeros(p0 + 1, dtype=float)
+    
+    l1 = empty(p1    , dtype=float)
+    r1 = empty(p1    , dtype=float)
+    v1 = zeros(p1 + 1, dtype=float)
+
+    span_0 = 0
+    span_1 = 0
+    
+    E   = zeros(3, dtype=float)
+    B   = zeros(3, dtype=float)
+    
+    delta = L/n_base
+    # ...
+    
+    
+    # ... needed for Boris algorithm
+    u_minus    = zeros(3, dtype=float)
+    t          = zeros(3, dtype=float)
+    u_minus_xt = zeros(3, dtype=float)
+    u_prime    = zeros(3, dtype=float)
+    S          = zeros(3, dtype=float)
+    u_prime_xS = zeros(3, dtype=float)
+    u_plus     = zeros(3, dtype=float)
+    
+    qprime = -dt/2
+    # ...
+    
+    np = len(particles[:, 0])
+    
+    
+    #$ omp parallel
+    #$ omp do private ( ip, pos, span_0, l0, r0, v0, span_1, l1, r1, v1, E, B, u_minus, gamma, t, u_minus_xt, u_prime, normB, r, S, u_prime_xS, u_plus, il0, jl0, i0, basis0, il1, jl1, i1, basis1 )
+    for ip in range(np):
+        # ... field evaluation (wave + background)
+        pos    = particles[ip, 0]
+        span_0 = spans_0[ip]
+        span_1 = span_0 - 1
+        
+        E[:]   = 0.
+        B[:]   = 0.
+        B[2]   = 1.
+       
+        for il0 in range(p0 + 1):
+            i0 = (span_0 - il0)%n_base
+
+            for jl0 in range(p0 + 1):
+
+                basis0 = pp_0[p0 - il0, jl0]*((pos - (span_0 - p0)*delta))**jl0
+
+                E[0] += ex[i0]*basis0
+                E[1] += ey[i0]*basis0
+
+        for il1 in range(p1 + 1):
+            i1 = (span_1 - il1)%n_base
+
+            for jl1 in range(p1 + 1):
+
+                basis1 = pp_1[p1 - il1, jl1]*((pos - (span_1 - p1)*delta))**jl1/delta
+
+                B[0] += bx[i1]*basis1
+                B[1] += by[i1]*basis1
+        # ...
+        
+        
+        # ... Boris push (relativistic)
+        if rel == 1:
+            u_minus = particles[ip, 1:4] + qprime*E
+            gamma = sqrt(1. + u_minus[0]**2 + u_minus[1]**2 + u_minus[2]**2)
+            t = qprime/gamma*B
+            cross(u_minus, t, u_minus_xt)
+            u_prime = u_minus + u_minus_xt
+            normB = B[0]**2 + B[1]**2 + B[2]**2
+            r = 1 + (qprime/gamma)**2*normB
+            S = 2*(qprime/gamma)*B/r
+            cross(u_prime, S, u_prime_xS)
+            u_plus = u_minus + u_prime_xS
+            particles[ip, 1:4] = u_plus + qprime*E
+            gamma = sqrt(1. + particles[ip, 1]**2 + particles[ip, 2]**2 + particles[ip, 3]**2)
+            particles[ip, 0] += dt*particles[ip, 3]/gamma
+            particles[ip, 0] = particles[ip, 0]%L
+        # ...
+        
+        # ... Boris push (non-relativistic)
+        else:
+            u_minus = particles[ip, 1:4] + qprime*E
+            t = qprime*B
+            cross(u_minus, t, u_minus_xt)
+            u_prime = u_minus + u_minus_xt
+            normB = B[0]**2 + B[1]**2 + B[2]**2
+            r = 1 + qprime**2*normB
+            S = 2*qprime*B/r
+            cross(u_prime, S, u_prime_xS)
+            u_plus = u_minus + u_prime_xS
+            particles[ip, 1:4] = u_plus + qprime*E
+            particles[ip, 0] += dt*particles[ip, 3]
+            particles[ip, 0] = particles[ip, 0]%L
+        # ...
+        
+    #$ omp end do
+    #$ omp end parallel
+        
+    ierr = 0
+    
+    
+       
 
 #==============================================================================
 @external_call
-@types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','double','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','double')
-def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, by, pp_0, pp_1, xi):
+@types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','double','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','double','int')
+def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, by, pp_0, pp_1, xi, rel):
     
     # ... needed for splines evaluation (in spaces V0 and V1)
     from numpy import empty
@@ -209,20 +375,36 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
         # ...
         
         
-        # ... Boris push
-        u_minus = particles[ip, 1:4] + qprime*E
-        gamma = sqrt(1. + u_minus[0]**2 + u_minus[1]**2 + u_minus[2]**2)
-        t = qprime/gamma*B
-        cross(u_minus, t, u_minus_xt)
-        u_prime = u_minus + u_minus_xt
-        normB = B[0]**2 + B[1]**2 + B[2]**2
-        r = 1 + (qprime/gamma)**2*normB
-        S = 2*(qprime/gamma)*B/r
-        cross(u_prime, S, u_prime_xS)
-        u_plus = u_minus + u_prime_xS
-        particles[ip, 1:4] = u_plus + qprime*E
-        gamma = sqrt(1. + particles[ip, 1]**2 + particles[ip, 2]**2 + particles[ip, 3]**2)
-        particles[ip, 0] += dt*particles[ip, 3]/gamma
+        # ... Boris push (relativistic)
+        if rel == 1:
+            u_minus = particles[ip, 1:4] + qprime*E
+            gamma = sqrt(1. + u_minus[0]**2 + u_minus[1]**2 + u_minus[2]**2)
+            t = qprime/gamma*B
+            cross(u_minus, t, u_minus_xt)
+            u_prime = u_minus + u_minus_xt
+            normB = B[0]**2 + B[1]**2 + B[2]**2
+            r = 1 + (qprime/gamma)**2*normB
+            S = 2*(qprime/gamma)*B/r
+            cross(u_prime, S, u_prime_xS)
+            u_plus = u_minus + u_prime_xS
+            particles[ip, 1:4] = u_plus + qprime*E
+            gamma = sqrt(1. + particles[ip, 1]**2 + particles[ip, 2]**2 + particles[ip, 3]**2)
+            particles[ip, 0] += dt*particles[ip, 3]/gamma
+        # ...
+        
+        # ... Boris push (non-relativistic)
+        else:
+            u_minus = particles[ip, 1:4] + qprime*E
+            t = qprime*B
+            cross(u_minus, t, u_minus_xt)
+            u_prime = u_minus + u_minus_xt
+            normB = B[0]**2 + B[1]**2 + B[2]**2
+            r = 1 + qprime**2*normB
+            S = 2*qprime*B/r
+            cross(u_prime, S, u_prime_xS)
+            u_plus = u_minus + u_prime_xS
+            particles[ip, 1:4] = u_plus + qprime*E
+            particles[ip, 0] += dt*particles[ip, 3]
         # ...
         
     #$ omp end do

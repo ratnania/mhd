@@ -28,6 +28,7 @@ T1 = T0[1:-1]
 Np  = int(5e6)
 
 xi = 0.862
+rel = 1
 dt = 0.02
 
 pp_0 = np.asfortranarray([[1/6, -1/(2*delta), 1/(2*delta**2), -1/(6*delta**3)], [2/3, 0., -1/delta**2, 1/(2*delta**3)], [1/6, 1/(2*delta), 1/(2*delta**2), -1/(2*delta**3)], [0., 0., 0., 1/(6*delta**3)]])
@@ -57,11 +58,11 @@ jh_x = np.empty(Nbase0, dtype=float)
 jh_y = np.empty(Nbase0, dtype=float)
 
 a = time.time()
-HyCho_PIC_fast.current(particles, T0, p, spans0, jh_x, jh_y, Nbase0)
+HyCho_PIC_fast.current(particles, T0, p, spans0, jh_x, jh_y, Nbase0, rel)
 b = time.time()
 print('time for hot current computation', b - a)
 
 a = time.time()
-HyCho_PIC_fast.pusher_reflecting(particles, dt, T0, T1, p, spans0, Lz, delta, ex, ey, bx, by, pp_0, pp_1, xi)
+HyCho_PIC_fast.pusher_reflecting(particles, dt, T0, T1, p, spans0, Lz, delta, ex, ey, bx, by, pp_0, pp_1, xi, rel)
 b = time.time()
 print('time for pushing particles', b - a)
