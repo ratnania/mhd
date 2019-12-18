@@ -50,19 +50,19 @@ name_control       = 'restart_files/control_variate1.npy'
 
 
 #=========================== time integration =======================================
-time_integr = 0                    # do time integration? (1 : yes, 0: no)
-title       = 'test.txt'           # name of file to save data
+time_integr = 1                    # do time integration? (1 : yes, 0: no)
+title       = 'spectrum_reflecting.txt'           # name of file to save data
 #====================================================================================
 
 
 
 #===== physical parameters ==========================================================
-wpe   = 5.                         # cold electron plasma frequency
-nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
+wpe   = 2.                         # cold electron plasma frequency
+nuh   = 2e-3                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
-wpar  = 0.2                        # parallel thermal velocity of energetic particles
-wperp = 0.53                       # perpendicular thermal velocity of energetic particles
-xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
+wpar  = 0.1                        # parallel thermal velocity of energetic particles
+wperp = 0.1                        # perpendicular thermal velocity of energetic particles
+xi    = 0.                         # inhomogeneity factor of background magnetic field
 
 rel   = 1                          # relativistic effects? (1: yes, 0: no)
 bc_d  = 1                          # damping of E and j at boundaries? (1: yes, 0: no)
@@ -74,12 +74,12 @@ bc_f  = 1                          # field line dependence of initial distributi
 #===== numerical parameters =========================================================
 bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
-Lz      = 327.7                    # length of z-domain
-Nel     = 3000                     # number of elements z-direction
-T       = 1000.                    # simulation time
-dt      = 0.02                     # time step
-p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(4e6)              # number of markers
+Lz      = 40                       # length of z-domain
+Nel     = 128                      # number of elements z-direction
+T       = 300.                     # simulation time
+dt      = 0.05                     # time step
+p       = 3                        # degree of B-spline basis functions in V0
+Np      = np.int(5e4)              # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
 #====================================================================================
@@ -135,7 +135,7 @@ B_background_z = lambda z : 1. + xi*(z - Lz/2)**2
 def fh0(z, vx, vy, vz):
 
     xiB = 1. - 1/B_background_z(z)
-    xiz = 1. + (wperp**2/wpar**2 - 1)*xiB*bc_f
+    xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
 
     return nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
 #====================================================================================
@@ -446,8 +446,11 @@ if time_integr == 1:
             Bx[:] = D.dot(bx)
         # ...
         
-        data = np.concatenate((Bx, energies, np.array([0.])))
-        np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+        #data = np.concatenate((Bx, energies, np.array([0.])))
+        #np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+        
+        data = np.concatenate((bx, energies, np.array([0.])))
+        np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
         
         time_step = 0
         counter   = 0
@@ -516,8 +519,11 @@ if time_integr == 1:
             # ... update and add new data to file
             update()
             
-            data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
-            np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+            #data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
+            #np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+            
+            data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
+            np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
             # ...
 
             time_step += 1
