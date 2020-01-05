@@ -203,8 +203,10 @@ def hotCurrentRel_bc_2(particles_pos, particles_vel_w, knots, p, qe, jh, c):
 
     #$ omp end do
     #$ omp end parallel
+    
 
     jh = qe/npart*jh
+    
 
     
 #==============================================================================
@@ -340,8 +342,8 @@ def borisGemRel_bc_2(particles, dt, qe, me, T, tz, p, ex, ey, bx, by, B0z, xi, L
         basis_funs(T, p, pos, s0, l0, r0, v0)
         basis_funs(tz, p - 1, pos, s1, l1, r1, v1)
         
-        if (particles[ipart, 0] + dt*particles[ipart, 3] > Lz) or (particles[ipart, 0] + dt*particles[ipart, 3] < 0.):
-            particles[ipart, 3] = -particles[ipart, 3]
+        #if (particles[ipart, 0] + dt*particles[ipart, 3] > Lz) or (particles[ipart, 0] + dt*particles[ipart, 3] < 0.):
+           # particles[ipart, 3] = -particles[ipart, 3]
             
         E[:] = 0.
         B[:] = 0.
@@ -369,6 +371,9 @@ def borisGemRel_bc_2(particles, dt, qe, me, T, tz, p, ex, ey, bx, by, B0z, xi, L
         B[0] += me*rho[0]/(qe*B[2])*(pos - Lz/2)*B0z*xi
         B[1] += me*rho[1]/(qe*B[2])*(pos - Lz/2)*B0z*xi
         # ...
+        
+        #print(E)
+        #print(B)
 
         u = particles[ipart, 1:4] + qprime*E[:]
         gamma = (1 + (u[0]**2 + u[1]**2 + u[2]**2)/c**2)**(1/2)
@@ -382,6 +387,11 @@ def borisGemRel_bc_2(particles, dt, qe, me, T, tz, p, ex, ey, bx, by, B0z, xi, L
         particles[ipart, 1:4] = up + qprime*E[:]
         gamma = (1 + (particles[ipart, 1]**2 + particles[ipart, 2]**2 + particles[ipart, 3]**2)/c**2)**(1/2)
         particles[ipart, 0] += dt*particles[ipart, 3]/gamma
+        
+        if (particles[ipart, 0] > Lz) or (particles[ipart, 0] < 0.):
+            particles[ipart, 3] = -particles[ipart, 3]
+            particles[ipart, 0] = pos + dt*particles[ipart, 3]/gamma
+        
 
     #$ omp end do
     #$ omp end parallel

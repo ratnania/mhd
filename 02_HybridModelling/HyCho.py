@@ -39,62 +39,74 @@ print('pyccelization of pic functions done!')
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
 restart            = 0
 
-max_time           = 1200.         # maximum runtime of program in minutes
-time_restart_files = 300.          # time interval for restart files in minutes
+max_time           = 30*60         # maximum runtime of program in minutes
+time_restart_files = 40*60         # time interval for restart files in minutes
 
-name_particles     = 'restart_files/particles1.npy'
-name_fields        = 'restart_files/fields1.npy'
-name_time_step     = 'restart_files/time_step1.npy'
-name_control       = 'restart_files/control_variate1.npy'
+name_particles     = 'restart_files/particles2.npy'
+name_fields        = 'restart_files/fields2.npy'
+name_time_step     = 'restart_files/time_step2.npy'
+name_control       = 'restart_files/control_variate2.npy'
 #====================================================================================
 
 
 #=========================== time integration =======================================
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
-title       = 'spectrum_reflecting.txt'           # name of file to save data
+title       = 'results/run_L=327.7_Nel=3000_T=2000_dt=0.04_Np=1e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on.txt'           # name of file to save data
 #====================================================================================
-
 
 
 #===== physical parameters ==========================================================
-wpe   = 2.                         # cold electron plasma frequency
-nuh   = 2e-3                       # ratio of cold/hot electron densities (nh/nc)
+wpe   = 5.                         # cold electron plasma frequency
+nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
-wpar  = 0.1                        # parallel thermal velocity of energetic particles
-wperp = 0.1                        # perpendicular thermal velocity of energetic particles
-xi    = 0.                         # inhomogeneity factor of background magnetic field
+wpar  = 0.2                        # parallel thermal velocity of energetic particles
+wperp = 0.53                       # perpendicular thermal velocity of energetic particles
+xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
 
-rel   = 1                          # relativistic effects? (1: yes, 0: no)
+rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
 bc_d  = 1                          # damping of E and j at boundaries? (1: yes, 0: no)
 bc_f  = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
-#====================================================================================
+#===================================================================================
 
 
 
 #===== numerical parameters =========================================================
 bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
-Lz      = 40                       # length of z-domain
-Nel     = 128                      # number of elements z-direction
-T       = 300.                     # simulation time
-dt      = 0.05                     # time step
-p       = 3                        # degree of B-spline basis functions in V0
-Np      = np.int(5e4)              # number of markers
-control = 1                        # control variate for noise reduction? (1: yes, 0: no)
+Lz      = 327.7                    # length of z-domain
+Nel     = 3000                     # number of elements z-direction
+T       = 2000.                    # simulation time
+dt      = 0.04                     # time step
+p       = 2                        # degree of B-spline basis functions in V0
+Np      = np.int(1e7)              # number of markers
+control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
 #====================================================================================
 
 
 #===== evaluation points for the magnetic field======================================
-eva_points_Bx = np.array([0.5, 1.])
+eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
 #====================================================================================
 
 
 #===== initial conditions ===========================================================
-amp = 1e-4                         # amplitude of initial wave field perturbations
+amp = 1e-5                         # amplitude of initial wave field perturbations
 
 Ex0 = lambda z : 0*z               # initial Ex
 Ey0 = lambda z : 0*z               # initial Ey
+
+'''
+def Bx0(z):
+    
+    value = 0.
+    modes = 1 + np.arange(int(Nel/4))
+    
+    for i in range(int(Nel/4)):
+        value += amp*np.random.rand()*np.sin(2*np.pi*modes[i]*z/Lz)
+     
+    return value
+'''
+
 Bx0 = lambda z : 0*z               # initial Bx
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
@@ -141,8 +153,19 @@ def fh0(z, vx, vy, vz):
 #====================================================================================
 
 
+
+
+
 #===== Maxwellian for control variate ===============================================
-maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
+#maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
+
+def maxwell(z, vx, vy, vz):
+    
+    xiB = 1. - 1/B_background_z(z)
+    xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
+    
+    return nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
+    
 #====================================================================================
 
 
@@ -286,14 +309,17 @@ particles[:, 0] = np.random.rand (Np)*Lz
 particles[:, 1] = np.random.randn(Np)*wperp
 particles[:, 2] = np.random.randn(Np)*wperp
 particles[:, 3] = np.random.randn(Np)*wpar
+#particles = np.load('particles.npy')
 
 spans0[:]       = np.floor(particles[:, 0]/dz).astype(int) + p
 #====================================================================================
 
 
+print('initial vx before pushing', particles[:10, 1])
+
 #===== parameters for control variate ===============================================
 g0 = g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
-w0 = 1/Np*fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
+w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
 #====================================================================================
 
 
@@ -304,12 +330,14 @@ timea = time.time()
 z_old[:] = particles[:, 0]
 
 if bc == True:
-    pic.pusher_periodic(particles, dt, T0, T1, p, spans0, Lz, Nbase0, ex, ey, bx, by, pp_0, pp_1, rel)
+    pic.pusher_periodic(particles, -dt/2, T0, T1, p, spans0, Lz, Nbase0, ex, ey, bx, by, pp_0, pp_1, rel)
 else:
-    pic.pusher_reflecting(particles, dt, T0, T1, p, spans0, Lz, dz, ex, ey, bx, by, pp_0, pp_1, xi, rel)
+    pic.pusher_reflecting(particles, -dt/2, T0, T1, p, spans0, Lz, dz, ex, ey, bx, by, pp_0, pp_1, xi, rel)
 
 particles[:, 0] = z_old
-particles[:, 4] = w0 - 1/Np*control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
+
+#particles[:, 4] = w0 - control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
+particles[:, 4] = w0 - control*maxwell(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g0
 
 timeb = time.time()
 print('time for particle push: ' + str(timeb - timea))
@@ -335,6 +363,8 @@ timeb = time.time()
 print('time for solving linear system: ' + str(timeb - timea))
 #====================================================================================
 
+print('initial vx after pushing', particles[:10, 1])
+print('initial weights after pushing', particles[:10, 4])
 
 #===== time integration by a time step dt ===========================================
 def update():
@@ -355,7 +385,8 @@ def update():
     
     
     # ... update weights with control variate
-    particles[:, 4] = w0 - 1/Np*control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
+    #particles[:, 4] = w0 - control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
+    particles[:, 4] = w0 - control*maxwell(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g0
     # ...
     
     
@@ -394,7 +425,7 @@ def update():
         energies[0] = 1/2      * (ex.dot(M0.dot(ex)) + ey.dot(M0.dot(ey)))
         energies[1] = 1/2      * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
         energies[2] = 1/wpe**2 * (yx.dot(M0.dot(yx)) + yy.dot(M0.dot(yy)))
-        energies[3] = 1/2      * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
+        energies[3] = 1/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
         
         Bx[:]  = D.dot(bx)
         
@@ -409,7 +440,7 @@ def update():
         energies[0] = 1/2      * (ex[1:-1].dot(M0.dot(ex[1:-1])) + ey[1:-1].dot(M0.dot(ey[1:-1])))
         energies[1] = 1/2      * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
         energies[2] = 1/wpe**2 * (yx[1:-1].dot(M0.dot(yx[1:-1])) + yy[1:-1].dot(M0.dot(yy[1:-1])))
-        energies[3] = 1/2      * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
+        energies[3] = 1/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
     
         Bx[:]  = D.dot(bx)
     # ...
@@ -433,7 +464,7 @@ if time_integr == 1:
             energies[0]  = 1/2      * (ex.dot(M0.dot(ex)) + ey.dot(M0.dot(ey)))
             energies[1]  = 1/2      * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
             energies[2]  = 1/wpe**2 * (yx.dot(M0.dot(yx)) + yy.dot(M0.dot(yy)))
-            energies[3]  = 1/2      * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
+            energies[3]  = 1/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
 
             Bx[:] = D.dot(bx)
 
@@ -441,16 +472,18 @@ if time_integr == 1:
             energies[0]  = 1/2      * (ex[1:-1].dot(M0.dot(ex[1:-1])) + ey[1:-1].dot(M0.dot(ey[1:-1])))
             energies[1]  = 1/2      * (bx.dot(M1.dot(bx)) + by.dot(M1.dot(by)))
             energies[2]  = 1/wpe**2 * (yx[1:-1].dot(M0.dot(yx[1:-1])) + yy[1:-1].dot(M0.dot(yy[1:-1])))
-            energies[3]  = 1/2      * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
+            energies[3]  = 1/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
 
             Bx[:] = D.dot(bx)
         # ...
         
-        #data = np.concatenate((Bx, energies, np.array([0.])))
-        #np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+        print('initial energies:', energies)
         
-        data = np.concatenate((bx, energies, np.array([0.])))
-        np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
+        data = np.concatenate((Bx, energies, np.array([0.])))
+        np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+        
+        #data = np.concatenate((bx, energies, np.array([0.])))
+        #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
         
         time_step = 0
         counter   = 0
@@ -503,6 +536,7 @@ if time_integr == 1:
 
             if time_step%50 == 0:
                 print('time steps finished: ' + str(time_step))
+                print('energies', energies)
 
             if (time.time() - last_time)/60 > time_restart_files:
                 
@@ -519,11 +553,11 @@ if time_integr == 1:
             # ... update and add new data to file
             update()
             
-            #data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
-            #np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+            data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
+            np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
             
-            data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
-            np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
+            #data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
+            #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
             # ...
 
             time_step += 1

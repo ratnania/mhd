@@ -125,6 +125,9 @@ def current(particles_pos, particles_v_w, knots, degree, spans, jh_x, jh_y, n_ba
     #$ omp end do
     #$ omp end parallel
     
+    jh_x = jh_x/np
+    jh_y = jh_y/np
+    
     ierr = 0
     
 
@@ -322,6 +325,10 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
         B[:]   = 0.
         B[2]   = 1. + xi*(pos - L/2)**2
         rho[:] = 0.
+        
+        #if (particles[ip, 0] + dt*particles[ip, 3] > L) or (particles[ip, 0] + dt*particles[ip, 3] < 0.):
+            #particles[ip, 3] = -particles[ip, 3]
+            
        
         if (pos < b_left) or (pos > b_right):
             basis_funs(t0, p0, pos, span_0, l0, r0, v0)
@@ -341,13 +348,7 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
                 basis1 = v1[p1 - il1]*p0/(t1[i1 + p0] - t1[i1])
                 
                 B[0] += bx[i1]*basis1
-                B[1] += by[i1]*basis1
-                
-            gamma = sqrt(1. + particles[ip, 1]**2 + particles[ip, 2]**2 + particles[ip, 3]**2)
-            
-            if (particles[ip, 0] + dt*particles[ip, 3]/gamma > L) or (particles[ip, 0] + dt*particles[ip, 3]/gamma < 0.):
-                particles[ip, 3] = -particles[ip, 3]
-                
+                B[1] += by[i1]*basis1       
         else:
             for il0 in range(p0 + 1):
                 i0 = span_0 - il0
@@ -374,6 +375,8 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
         B[1] -= rho[1]/B[2]*(pos - L/2)*xi
         # ...
         
+        #print(E)
+        #print(B)
         
         # ... Boris push (relativistic)
         if rel == 1:
@@ -390,6 +393,11 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
             particles[ip, 1:4] = u_plus + qprime*E
             gamma = sqrt(1. + particles[ip, 1]**2 + particles[ip, 2]**2 + particles[ip, 3]**2)
             particles[ip, 0] += dt*particles[ip, 3]/gamma
+            
+            if (particles[ip, 0] > L) or (particles[ip, 0] < 0.):
+                particles[ip, 3] = -particles[ip, 3]
+                particles[ip, 0] = pos + dt*particles[ip, 3]/gamma
+                    
         # ...
         
         # ... Boris push (non-relativistic)
@@ -405,6 +413,9 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
             u_plus = u_minus + u_prime_xS
             particles[ip, 1:4] = u_plus + qprime*E
             particles[ip, 0] += dt*particles[ip, 3]
+            
+            if (particles[ip, 0] > L) or (particles[ip, 0] < 0.):
+                particles[ip, 0] = pos - dt*particles[ip, 3]
         # ...
         
     #$ omp end do

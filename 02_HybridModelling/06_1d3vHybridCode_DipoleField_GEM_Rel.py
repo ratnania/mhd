@@ -18,8 +18,7 @@ import utilitis_pic_Rel
 #  calling epyccel
 #====================================================================================
 from pyccel.epyccel import epyccel
-#utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
-utils_pic_fast = epyccel(utilitis_pic_Rel)
+utils_pic_fast = epyccel(utilitis_pic_Rel, accelerator='openmp')
 
 print('pyccelization of pic functions done!')
 #====================================================================================
@@ -29,9 +28,10 @@ print('pyccelization of pic functions done!')
 
 
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
-restart            = 1
-max_time           = 1.             # maximum runtime in minutes
-time_restart_files = 0.3            # time after which the current configuration is saved in minutes
+restart            = 0
+
+max_time           = 30*60          # maximum runtime in minutes
+time_restart_files = 40*60          # time after which the current configuration is saved in minutes
 
 name_particles     = 'restart_files/particles1.npy'
 name_fields        = 'restart_files/fields1.npy'
@@ -43,7 +43,7 @@ name_control       = 'restart_files/control_variate1.npy'
 
 #===== saving data? (save = 1: yes, save = 0: no). If yes, name directory ===========
 save        = 1
-title       = 'test_restart.txt' 
+title       = 'results/short_old.txt' 
 saving_step = 1                    # save data only every saving_stepth time step
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
 #====================================================================================
@@ -59,12 +59,12 @@ me    = 1.0                        # electron mass
 B0z   = 1.0                        # minimum of background magnetic field in z-direction
 wce   = qe*B0z/me                  # electron cyclotron frequency
 wpe   = 5*np.abs(wce)              # cold electron plasma frequency
-nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
+nuh   = 6e-2                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2*c                      # parallel thermal velocity of energetic particles
 wperp = 0.53*c                     # perpendicular thermal velocity of energetic particles
 
-xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
+xi    = 0.                         # inhomogeneity factor of background magnetic field
 
 bcs_d = 1                          # damping of wave fields at boundaries? (1: yes, 0: no)
 bcs_g = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
@@ -80,7 +80,7 @@ eps = 0.                           # amplitude of spatial pertubation of initial
 
 Ex0 = lambda z : 0*z               # initial Ex
 Ey0 = lambda z : 0*z               # initial Ey
-Bx0 = lambda z : 0*z               # initial Bx
+Bx0 = lambda z : amp*np.sin(104*2*np.pi*z/Lz) # initial Bx
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
 jy0 = lambda z : 0*z               # initial jcy
@@ -90,11 +90,11 @@ jy0 = lambda z : 0*z               # initial jcy
 
 #===== numerical parameters =========================================================
 Lz      = 327.7                    # length of z-domain
-Nel     = 200                      # number of elements z-direction
-T       = 1000.                    # simulation time
+Nel     = 1800                     # number of elements z-direction
+T       = 1.                      # simulation time
 dt      = 0.04                     # time step
 p       = 3                        # degree of B-spline basis functions in V0
-Np      = np.int(5e4)              # number of markers
+Np      = np.int(5e6)              # number of markers
 control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 
 Ld      = 0.046*Lz                 # length of damping region at each end
@@ -304,11 +304,13 @@ print('damping assembly done!')
 
 
 #===== create particles (z,vx,vy,vz,wk) and sample according to sampling distribution
-particles = np.zeros((Np, 5), order='F')
-particles[:, 0] = np.random.rand(Np)*Lz
-particles[:, 1] = np.random.randn(Np)*wperp
-particles[:, 2] = np.random.randn(Np)*wperp
-particles[:, 3] = np.random.randn(Np)*wpar
+#particles = np.zeros((Np, 5), order='F')
+#particles[:, 0] = np.random.rand(Np)*Lz
+#particles[:, 1] = np.random.randn(Np)*wperp
+#particles[:, 2] = np.random.randn(Np)*wperp
+#particles[:, 3] = np.random.randn(Np)*wpar
+
+particles = np.load('particles.npy')
 
 jh = np.zeros(2*Nbase0)
 Fh = np.zeros(4*Nbase0_0 + 2*Nbase1_0)
@@ -328,10 +330,27 @@ timea = time.time()
 
 z_old[:] = particles[:, 0]
 
+print('initial vx before pushing', particles[:10, 1])
+
 utils_pic_fast.borisGemRel_bc_2(particles, -dt/2, qe, me, Tz, tz, p, ex, ey, bx, by, B0z, xi, Lz, c)
+
+particles_old = np.load('particles_old.npy')
+
+print(np.allclose(particles_old[:, 1], particles[:, 1]))
+print(np.allclose(particles_old[:, 2], particles[:, 2]))
+print(np.allclose(particles_old[:, 3], particles[:, 3]))
+
+
+
 
 particles[:, 0] = z_old
 particles[:, 4] = w0 - control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
+
+print(np.allclose(particles_old[:, 4], particles[:, 4]))
+
+print('initial hot energy load', me/(2*Np) * particles_old[:, 4].dot(particles_old[:, 1]**2 + particles_old[:, 2]**2 + particles_old[:, 3]**2) + control*Eh_eq)
+
+print('initial hot energy', me/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq)
 
 timeb = time.time()
 print('time for particle push: ' + str(timeb - timea))
@@ -358,6 +377,8 @@ LU.solve(RHS.dot(uj) + dt*Fh)
 timeb = time.time()
 print('time for solving linear system: ' + str(timeb - timea))
 #====================================================================================
+
+
 
 
 
@@ -419,6 +440,7 @@ if restart == 0:
     en_H = me/(2*Np) * particles[:, 4].dot(particles[:, 1]**2 + particles[:, 2]**2 + particles[:, 3]**2) + control*Eh_eq
 
     Bx_save = D.dot(bx)
+    print('initial energies : ', en_E, en_B, en_C, en_H)
 
     if save == 1:
         data = np.append(Bx_save, np.array([en_E, en_B, en_C, en_H, 0.]))
@@ -476,6 +498,7 @@ if time_integr == 1:
 
             if time_step%50 == 0:
                 print('time steps finished: ' + str(time_step))
+                print('energies : ', en_E, en_B, en_C, en_H)
 
             
             if (time.time() - last_time)/60 > time_restart_files:
