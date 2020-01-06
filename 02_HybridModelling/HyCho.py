@@ -39,19 +39,19 @@ print('pyccelization of pic functions done!')
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
 restart            = 0
 
-max_time           = 30*60         # maximum runtime of program in minutes
-time_restart_files = 40*60         # time interval for restart files in minutes
+max_time           = 60*60         # maximum runtime of program in minutes
+time_restart_files = 60*60         # time interval for restart files in minutes
 
-name_particles     = 'restart_files/particles2.npy'
-name_fields        = 'restart_files/fields2.npy'
-name_time_step     = 'restart_files/time_step2.npy'
-name_control       = 'restart_files/control_variate2.npy'
+name_particles     = 'restart_files/particles1.npy'
+name_fields        = 'restart_files/fields1.npy'
+name_time_step     = 'restart_files/time_step1.npy'
+name_control       = 'restart_files/control_variate1.npy'
 #====================================================================================
 
 
 #=========================== time integration =======================================
 time_integr = 1                    # do time integration? (1 : yes, 0: no)
-title       = 'results/run_L=327.7_Nel=3000_T=2000_dt=0.04_Np=1e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on.txt'           # name of file to save data
+title       = 'results/run_L=327.7_Nel=3400_T=2000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55.txt'           # name of file to save data
 #====================================================================================
 
 
@@ -60,7 +60,7 @@ wpe   = 5.                         # cold electron plasma frequency
 nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2                        # parallel thermal velocity of energetic particles
-wperp = 0.53                       # perpendicular thermal velocity of energetic particles
+wperp = 0.55                       # perpendicular thermal velocity of energetic particles
 xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
 
 rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
@@ -74,11 +74,11 @@ bc_f  = 1                          # field line dependence of initial distributi
 bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
 Lz      = 327.7                    # length of z-domain
-Nel     = 3000                     # number of elements z-direction
+Nel     = 3400                     # number of elements z-direction
 T       = 2000.                    # simulation time
-dt      = 0.04                     # time step
+dt      = 0.02                     # time step
 p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(1e7)              # number of markers
+Np      = np.int(1.5e7)              # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
 #====================================================================================
