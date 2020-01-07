@@ -31,7 +31,14 @@ print('pyccelization of pic functions done!')
 
 
 
+#=========================== time integration =======================================
+time_integr = 1                                                 # do time integration? (1 : yes, 0: no)
 
+identifier  = 'run_L=327.7_Nel=3400_T=2000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55'        # name of saved files
+
+dir_results = 'results/'                                        # directory of where to save results
+dir_restart = 'restart_files/'                                  # directory of where to save restart files
+#====================================================================================
 
 
 
@@ -49,10 +56,7 @@ name_control       = 'restart_files/control_variate1.npy'
 #====================================================================================
 
 
-#=========================== time integration =======================================
-time_integr = 1                    # do time integration? (1 : yes, 0: no)
-title       = 'results/run_L=327.7_Nel=3400_T=2000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55.txt'           # name of file to save data
-#====================================================================================
+
 
 
 #===== physical parameters ==========================================================
@@ -89,7 +93,7 @@ eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
 #====================================================================================
 
 
-#===== initial conditions ===========================================================
+#===== initial conditions for fields ================================================
 amp = 1e-5                         # amplitude of initial wave field perturbations
 
 Ex0 = lambda z : 0*z               # initial Ex
@@ -132,9 +136,9 @@ Nbase1_dof = Nbase1                          # number of degrees of freedom in V
 nh       = nuh*wpe**2                                 # hot electron density
 Eh_eq    = Lz*nh/2*(wpar**2 + 2*wperp**2)             # equilibrium energetic electron energy
 
-energies = np.empty(4, dtype=float)                   # energies: E, B, Cold, Hot
+energies = np.empty(4, dtype=float)                   # energies: E, B, cold, hot
 
-Bx       = np.empty(len(eva_points_Bx), dtype=float)  
+Bx       = np.empty(len(eva_points_Bx), dtype=float)  # x-component of magnetic field at some positions
 #====================================================================================
 
 
@@ -165,7 +169,6 @@ def maxwell(z, vx, vy, vz):
     xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
     
     return nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
-    
 #====================================================================================
 
 
@@ -312,10 +315,11 @@ particles[:, 3] = np.random.randn(Np)*wpar
 #particles = np.load('particles.npy')
 
 spans0[:]       = np.floor(particles[:, 0]/dz).astype(int) + p
+
+#print('initial vx before pushing', particles[:10, 1])
 #====================================================================================
 
 
-print('initial vx before pushing', particles[:10, 1])
 
 #===== parameters for control variate ===============================================
 g0 = g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
@@ -363,8 +367,12 @@ timeb = time.time()
 print('time for solving linear system: ' + str(timeb - timea))
 #====================================================================================
 
-print('initial vx after pushing', particles[:10, 1])
-print('initial weights after pushing', particles[:10, 4])
+
+
+#print('initial vx after pushing', particles[:10, 1])
+#print('initial weights after pushing', particles[:10, 4])
+
+
 
 #===== time integration by a time step dt ===========================================
 def update():
@@ -457,6 +465,7 @@ def update():
 if time_integr == 1:
     
     if restart == 0:
+        title = dir_results + identifier + '.txt'
         file = open(title, 'ab')
         
         # ... initial diagnostics
@@ -479,17 +488,25 @@ if time_integr == 1:
         
         print('initial energies:', energies)
         
+        
+        
+        
+        #================ save initial data in this section ==========================
         data = np.concatenate((Bx, energies, np.array([0.])))
         np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
         
         #data = np.concatenate((bx, energies, np.array([0.])))
         #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
+        #=============================================================================
+        
+        
         
         time_step = 0
         counter   = 0
         
     else:
         #===== load restart data =====================================================
+        title = dir_results + identifier + '.txt'
         file = open(title, 'ab')
 
         particles[:] = np.load(name_particles)
@@ -527,10 +544,10 @@ if time_integr == 1:
 
                 counter += 1
 
-                np.save('restart_files/particles'       + str(counter), particles)
-                np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
-                np.save('restart_files/fields'          + str(counter), uj)
-                np.save('restart_files/time_step'       + str(counter), np.array([time_step, counter]))
+                np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
+                np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
+                np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
+                np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
 
                 break
 
@@ -542,15 +559,17 @@ if time_integr == 1:
                 
                 counter += 1
 
-                np.save('restart_files/particles'       + str(counter), particles)
-                np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
-                np.save('restart_files/fields'          + str(counter), uj)
-                np.save('restart_files/time_step'       + str(counter), np.array([time_step, counter]))
+                np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
+                np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
+                np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
+                np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
 
                 last_time = time.time()
 
 
-            # ... update and add new data to file
+                
+                
+            #========================= update and add new data to file ===============
             update()
             
             data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
@@ -558,8 +577,10 @@ if time_integr == 1:
             
             #data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
             #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
-            # ...
+            #=========================================================================
 
+            
+            
             time_step += 1
 
         except KeyboardInterrupt:
@@ -573,10 +594,10 @@ if time_integr == 1:
                     
                     counter += 1
 
-                    np.save('restart_files/particles'       + str(counter), particles)
-                    np.save('restart_files/control_variate' + str(counter), np.vstack((w0, g0)))
-                    np.save('restart_files/fields'          + str(counter), uj)
-                    np.save('restart_files/time_step'       + str(counter), np.array([time_step, counter]))
+                    np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
+                    np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
+                    np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
+                    np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
                     
                     break
 
