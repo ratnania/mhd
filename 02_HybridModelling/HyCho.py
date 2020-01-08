@@ -34,7 +34,7 @@ print('pyccelization of pic functions done!')
 #=========================== time integration =======================================
 time_integr = 1                                                 # do time integration? (1 : yes, 0: no)
 
-identifier  = 'run_L=327.7_Nel=3400_T=2000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55'        # name of saved files
+identifier  = 'run_L=327.7_Nel=3600_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.53'        # name of saved files
 
 dir_results = 'results/'                                        # directory of where to save results
 dir_restart = 'restart_files/'                                  # directory of where to save restart files
@@ -46,13 +46,13 @@ dir_restart = 'restart_files/'                                  # directory of w
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
 restart            = 0
 
-max_time           = 60*60         # maximum runtime of program in minutes
+max_time           = 23.5*60       # maximum runtime of program in minutes
 time_restart_files = 60*60         # time interval for restart files in minutes
 
-name_particles     = 'restart_files/particles1.npy'
-name_fields        = 'restart_files/fields1.npy'
-name_time_step     = 'restart_files/time_step1.npy'
-name_control       = 'restart_files/control_variate1.npy'
+name_particles     = 'restart_files/' + 'restart=particles1.npy'
+name_fields        = 'restart_files/' + 'restart=fields1.npy'
+name_time_step     = 'restart_files/' + 'restart=time.npy'
+name_control       = 'restart_files/' + 'restart=CV1.npy'
 #====================================================================================
 
 
@@ -64,7 +64,7 @@ wpe   = 5.                         # cold electron plasma frequency
 nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2                        # parallel thermal velocity of energetic particles
-wperp = 0.55                       # perpendicular thermal velocity of energetic particles
+wperp = 0.53                       # perpendicular thermal velocity of energetic particles
 xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
 
 rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
@@ -78,11 +78,11 @@ bc_f  = 1                          # field line dependence of initial distributi
 bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
 Lz      = 327.7                    # length of z-domain
-Nel     = 3400                     # number of elements z-direction
-T       = 2000.                    # simulation time
+Nel     = 3600                     # number of elements z-direction
+T       = 5000.                    # simulation time
 dt      = 0.02                     # time step
 p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(1.5e7)              # number of markers
+Np      = np.int(1.5e7)            # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
 #====================================================================================
@@ -544,10 +544,10 @@ if time_integr == 1:
 
                 counter += 1
 
-                np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
-                np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
-                np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
-                np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
+                np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
 
                 break
 
@@ -559,10 +559,10 @@ if time_integr == 1:
                 
                 counter += 1
 
-                np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
-                np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
-                np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
-                np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
+                np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
 
                 last_time = time.time()
 
@@ -594,10 +594,10 @@ if time_integr == 1:
                     
                     counter += 1
 
-                    np.save(dir_restart + identifier + 'restart=particles' + str(counter), particles)
-                    np.save(dir_restart + identifier + 'restart=CV'        + str(counter), np.vstack((w0, g0)))
-                    np.save(dir_restart + identifier + 'restart=fields'    + str(counter), uj)
-                    np.save(dir_restart + identifier + 'restart=time'      + str(counter), np.array([time_step, counter]))
+                    np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                    np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                    np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                    np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
                     
                     break
 

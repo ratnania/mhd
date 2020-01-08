@@ -1,11 +1,11 @@
 #!/bin/bash -l
 # Standard output and error:
-#SBATCH -o ./tjob_hybrid.out
-#SBATCH -e ./tjob_hybrid.err
+#SBATCH -o ./tjob_HyCho.out.%j
+#SBATCH -e ./tjob_HyCho.err.%j
 # Initial working directory:
 #SBATCH -D ./
 # Job Name:
-#SBATCH -J test_hybridpic
+#SBATCH -J HyCho
 # Queue (Partition):
 #SBATCH --partition=general
 # Number of nodes and MPI tasks per node:
@@ -13,7 +13,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --ntasks-per-core=1
 # for OpenMP:
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #
 # Request 80 GB of main memory per node in units of MB:
 #SBATCH --mem=81920
