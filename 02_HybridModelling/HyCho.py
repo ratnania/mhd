@@ -15,9 +15,7 @@ from scipy.sparse.linalg import splu
 from scipy.sparse        import block_diag
 from scipy.sparse.linalg import inv
 
-
-
-
+import scipy.special as sp
 
 
 #====================================================================================
@@ -34,7 +32,9 @@ print('pyccelization of pic functions done!')
 #=========================== time integration =======================================
 time_integr = 1                                                 # do time integration? (1 : yes, 0: no)
 
-identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55'        # name of saved files
+#identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55_local'  # name of saved files
+
+identifier = 'test_new'
 
 dir_results = 'results/'                                        # directory of where to save results
 dir_restart = 'restart_files/'                                  # directory of where to save restart files
@@ -44,11 +44,12 @@ dir_restart = 'restart_files/'                                  # directory of w
 
 
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
-restart            = 1
+restart            = 0
 
-max_time           = 50*60       # maximum runtime of program in minutes
-time_restart_files = 60*60         # time interval for restart files in minutes
+max_time           = 100*60         # maximum runtime of program in minutes
+time_restart_files = 120*60         # time interval for restart files in minutes
 
+# names of restart files
 name_particles     = 'restart_files/' + identifier + '_restart=particles1.npy'
 name_fields        = 'restart_files/' + identifier + '_restart=fields1.npy'
 name_time_step     = 'restart_files/' + identifier + '_restart=time1.npy'
@@ -65,26 +66,28 @@ nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2                        # parallel thermal velocity of energetic particles
 wperp = 0.55                       # perpendicular thermal velocity of energetic particles
-xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
+xi    = 8.62e-5*0                    # inhomogeneity factor of background magnetic field
 
 rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
-bc_d  = 1                          # damping of E and j at boundaries? (1: yes, 0: no)
-bc_f  = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
+bc_d  = 0                          # damping of E and j at boundaries? (1: yes, 0: no)
+bc_f  = 0                          # field line dependence of initial distribution function? (1: yes, 0: no)
 #===================================================================================
 
 
 
 #===== numerical parameters =========================================================
-bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
+bc      = True                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
-Lz      = 327.7                    # length of z-domain
-Nel     = 3400                     # number of elements z-direction
-T       = 5000.                    # simulation time
+Lz      = 325.                     # length of z-domain
+Nel     = 5000                     # number of elements z-direction
+T       = 0.4                      # simulation time
 dt      = 0.02                     # time step
 p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(1.5e7)            # number of markers
+Np      = np.int(1.3e7)            # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
+loading = 2                        # particle loading (0: random with seperate generators, 1: random with one generator, 2: loading form a file)
+name_initial_particles = 'test_particles_Np=1.3e7_1.npy' # name of particle file
 #====================================================================================
 
 
@@ -94,7 +97,7 @@ eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
 
 
 #===== initial conditions for fields ================================================
-amp = 1e-5                         # amplitude of initial wave field perturbations
+amp = 1e-4                         # amplitude of initial wave field perturbations
 
 Ex0 = lambda z : 0*z               # initial Ex
 Ey0 = lambda z : 0*z               # initial Ey
@@ -111,7 +114,10 @@ def Bx0(z):
     return value
 '''
 
+
 Bx0 = lambda z : 0*z               # initial Bx
+#Bx0 = lambda z : amp*np.sin(k*z)
+
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
 jy0 = lambda z : 0*z               # initial jcy
@@ -158,11 +164,7 @@ def fh0(z, vx, vy, vz):
 
 
 
-
-
 #===== Maxwellian for control variate ===============================================
-#maxwell = lambda vx, vy, vz : nh/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
-
 def maxwell(z, vx, vy, vz):
     
     xiB = 1. - 1/B_background_z(z)
@@ -217,10 +219,10 @@ print('matrix assembly done!')
 #=================== coefficients for pp-forms ======================================
 if p == 3:
     pp_0 = np.asfortranarray([[1/6, -1/(2*dz), 1/(2*dz**2), -1/(6*dz**3)], [2/3, 0., -1/dz**2, 1/(2*dz**3)], [1/6, 1/(2*dz), 1/(2*dz**2), -1/(2*dz**3)], [0., 0., 0., 1/(6*dz**3)]])
-    pp_1 = np.asfortranarray([[1/2, -1/dz, 1/(2*dz**2)], [1/2, 1/dz, -1/dz**2], [0., 0., 1/(2*dz**2)]])
+    pp_1 = np.asfortranarray([[1/2, -1/dz, 1/(2*dz**2)], [1/2, 1/dz, -1/dz**2], [0., 0., 1/(2*dz**2)]])/dz
 elif p == 2:
     pp_0 = np.asfortranarray([[1/2, -1/dz, 1/(2*dz**2)], [1/2, 1/dz, -1/dz**2], [0., 0., 1/(2*dz**2)]])
-    pp_1 = np.asfortranarray([[1., -1/dz], [0., 1/dz]])
+    pp_1 = np.asfortranarray([[1., -1/dz], [0., 1/dz]])/dz
 else:
     print('Only cubic and quadratic splines implemented!')
 #====================================================================================
@@ -308,15 +310,34 @@ print('damping assembly done!')
 #===== create particles (z, vx, vy, vz, wk) and sample according to sampling distribution
 particles       = np.zeros((Np, 5), order='F', dtype=float)
 
-particles[:, 0] = np.random.rand (Np)*Lz
-particles[:, 1] = np.random.randn(Np)*wperp
-particles[:, 2] = np.random.randn(Np)*wperp
-particles[:, 3] = np.random.randn(Np)*wpar
-#particles = np.load('particles.npy')
+if loading == 0: 
+    particles[:, 0] = np.random.rand (Np)*Lz
+    particles[:, 1] = np.random.randn(Np)*wperp
+    particles[:, 2] = np.random.randn(Np)*wperp
+    particles[:, 3] = np.random.randn(Np)*wpar
+    
+elif loading == 1:
+    particles[:, :4] = np.random.rand(Np, 4)
 
-spans0[:]       = np.floor(particles[:, 0]/dz).astype(int) + p
+    particles[:, 0]  = particles[:, 0]*Lz
+    particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
+    
+elif loading == 2:
+    particles[:, :] = np.load(name_initial_particles)
 
-#print('initial vx before pushing', particles[:10, 1])
+    #particles[:, 0] = particles[:, 0]*Lz
+    #particles[:, 1] = particles[:, 1]*wperp
+    #particles[:, 2] = particles[:, 2]*wperp
+    #particles[:, 3] = particles[:, 3]*wpar
+
+    particles[:, 0]  = particles[:, 0]*Lz
+    particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar *np.sqrt(2)
+    
+spans0[:] = np.floor(particles[:, 0]/dz).astype(int) + p
 #====================================================================================
 
 
@@ -340,7 +361,6 @@ else:
 
 particles[:, 0] = z_old
 
-#particles[:, 4] = w0 - control*maxwell(particles[:, 1], particles[:, 2], particles[:, 3])/g0
 particles[:, 4] = w0 - control*maxwell(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g0
 
 timeb = time.time()
@@ -366,11 +386,6 @@ LU.solve(RHS.dot(uj) + dt*Fh)
 timeb = time.time()
 print('time for solving linear system: ' + str(timeb - timea))
 #====================================================================================
-
-
-
-#print('initial vx after pushing', particles[:10, 1])
-#print('initial weights after pushing', particles[:10, 4])
 
 
 
@@ -492,6 +507,8 @@ if time_integr == 1:
         
         
         #================ save initial data in this section ==========================
+        #en_Bx = 1/2 * bx.dot(M1.dot(bx))
+        
         data = np.concatenate((Bx, energies, np.array([0.])))
         np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
         
@@ -572,8 +589,11 @@ if time_integr == 1:
             #========================= update and add new data to file ===============
             update()
             
+            #en_Bx = 1/2 * bx.dot(M1.dot(bx))
+        
             data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
             np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+            
             
             #data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
             #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')

@@ -11,12 +11,10 @@ def cross(a, b, r):
     r[0] = a[1]*b[2] - a[2]*b[1]
     r[1] = a[2]*b[0] - a[0]*b[2]
     r[2] = a[0]*b[1] - a[1]*b[0]
+#==============================================================================
 
 
-    
-    
-    
-    
+
 #==============================================================================
 @pure
 @types('double[:]','int','double')
@@ -48,9 +46,9 @@ def find_span(knots, degree, x):
         returnVal = span
 
     return returnVal
-    
-    
-    
+#============================================================================== 
+
+
 
 #==============================================================================
 @types('double[:]','int','double','int','double[:]','double[:]','double[:]')
@@ -71,8 +69,8 @@ def basis_funs(knots, degree, x, span, left, right, values):
             saved     = left[j - r]*temp
         
         values[j + 1] = saved
-        
-        
+#==============================================================================
+
 
 
 #==============================================================================
@@ -92,15 +90,13 @@ def current(particles_pos, particles_v_w, knots, degree, spans, jh_x, jh_y, n_ba
     left   = empty(degree,     dtype=float)
     right  = empty(degree,     dtype=float)
     values = zeros(degree + 1, dtype=float)
-
-    span = 0
     # ...
     
     
     np = len(particles_pos)
     
     #$ omp parallel
-    #$ omp do reduction ( + : jh_x, jh_y ) private ( ip, pos, span, left, right, values, ux, uy, uz, wp_over_gamma, il, i, bi )
+    #$ omp do reduction (+ : jh_x, jh_y) private (ip, pos, span, left, right, values, ux, uy, uz, wp_over_gamma, il, i, bi )
     for ip in range(np):
         pos  = particles_pos[ip]
         span = spans[ip]
@@ -129,46 +125,28 @@ def current(particles_pos, particles_v_w, knots, degree, spans, jh_x, jh_y, n_ba
     jh_y = jh_y/np
     
     ierr = 0
-    
-
-    
-    
-    
-    
-    
+#==============================================================================
+ 
     
     
 #==============================================================================
 @external_call
 @types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','int')
-def pusher_periodic(particles, dt, t0, t1, p0, spans_0, L, n_base, ex, ey, bx, by, pp_0, pp_1, rel):
+def pusher_periodic(particles, dt, t0, t1, p0, spans0, L, nbase0, ex, ey, bx, by, pp0, pp1, rel):
     
-    # ... needed for splines evaluation (in spaces V0 and V1)
     from numpy import empty
     from numpy import zeros
     from numpy import sqrt
     
-    p1 = p0 - 1
-
-    l0 = empty(p0,     dtype=float)
-    r0 = empty(p0,     dtype=float)
-    v0 = zeros(p0 + 1, dtype=float)
+    p1         = p0 - 1
     
-    l1 = empty(p1    , dtype=float)
-    r1 = empty(p1    , dtype=float)
-    v1 = zeros(p1 + 1, dtype=float)
-
-    span_0 = 0
-    span_1 = 0
+    E          = zeros(3     , dtype=float)
+    B          = zeros(3     , dtype=float)
     
-    E   = zeros(3, dtype=float)
-    B   = zeros(3, dtype=float)
+    delta      = L/nbase0
     
-    delta = L/n_base
-    # ...
+    qprime     = -dt/2
     
-    
-    # ... needed for Boris algorithm
     u_minus    = zeros(3, dtype=float)
     t          = zeros(3, dtype=float)
     u_minus_xt = zeros(3, dtype=float)
@@ -177,51 +155,52 @@ def pusher_periodic(particles, dt, t0, t1, p0, spans_0, L, n_base, ex, ey, bx, b
     u_prime_xS = zeros(3, dtype=float)
     u_plus     = zeros(3, dtype=float)
     
-    qprime = -dt/2
-    # ...
-    
-    np = len(particles[:, 0])
+    np         = len(particles[:, 0])
     
     
     #$ omp parallel
-    #$ omp do private ( ip, pos, span_0, l0, r0, v0, span_1, l1, r1, v1, E, B, u_minus, gamma, t, u_minus_xt, u_prime, normB, r, S, u_prime_xS, u_plus, il0, jl0, i0, basis0, il1, jl1, i1, basis1 )
+    #$ omp do private (ip, pos_loc, span0, span1, E, B, u_minus, gamma, t, u_minus_xt, u_prime, normB, r, S, u_prime_xS, u_plus, il, jl, i, basis, power)
     for ip in range(np):
-        # ... field evaluation (wave + background)
-        pos    = particles[ip, 0]
-        span_0 = spans_0[ip]
-        span_1 = span_0 - 1
         
-        E[:]   = 0.
-        B[:]   = 0.
-        B[2]   = 1.
-       
-        for il0 in range(p0 + 1):
-            i0 = (span_0 - il0)%n_base
+        # ... field evaluation (wave + background)
+        span0   = spans0[ip]
+        span1   = span0 - 1
+        
+        E[:]    = 0.
+        B[:]    = 0.
+        B[2]    = 1.
+        
+        pos_loc = particles[ip, 0] - (span0 - p0)*delta
 
-            for jl0 in range(p0 + 1):
+        for jl in range(p0 + 1):
+            power = pos_loc**jl
 
-                basis0 = pp_0[p0 - il0, jl0]*((pos - (span_0 - p0)*delta))**jl0
+            for il in range(p0 + 1):
+                i = (span0 - il)%nbase0
+                basis = pp0[p0 - il, jl]*power
 
-                E[0] += ex[i0]*basis0
-                E[1] += ey[i0]*basis0
+                E[0] += ex[i]*basis
+                E[1] += ey[i]*basis
 
-        for il1 in range(p1 + 1):
-            i1 = (span_1 - il1)%n_base
 
-            for jl1 in range(p1 + 1):
+        for jl in range(p1 + 1):
+            power = pos_loc**jl
 
-                basis1 = pp_1[p1 - il1, jl1]*((pos - (span_1 - p1)*delta))**jl1/delta
+            for il in range(p1 + 1):
+                i = (span1 - il)%nbase0
+                basis = pp1[p1 - il, jl]*power
 
-                B[0] += bx[i1]*basis1
-                B[1] += by[i1]*basis1
+                B[0] += bx[i]*basis
+                B[1] += by[i]*basis
         # ...
+        
         
         
         # ... Boris push (relativistic)
         if rel == 1:
             u_minus = particles[ip, 1:4] + qprime*E
-            gamma = sqrt(1. + u_minus[0]**2 + u_minus[1]**2 + u_minus[2]**2)
-            t = qprime/gamma*B
+            gamma   = sqrt(1. + u_minus[0]**2 + u_minus[1]**2 + u_minus[2]**2)
+            t       = qprime/gamma*B
             cross(u_minus, t, u_minus_xt)
             u_prime = u_minus + u_minus_xt
             normB = B[0]**2 + B[1]**2 + B[2]**2
@@ -255,51 +234,46 @@ def pusher_periodic(particles, dt, t0, t1, p0, spans_0, L, n_base, ex, ey, bx, b
     #$ omp end parallel
         
     ierr = 0
+#==============================================================================
     
     
-       
-
+    
+    
+    
+    
+    
 #==============================================================================
 @external_call
 @types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','double','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','double','int')
-def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, by, pp_0, pp_1, xi, rel):
+def pusher_reflecting(particles, dt, t0, t1, p0, spans0, L, delta, ex, ey, bx, by, pp0, pp1, xi, rel):
     
-    # ... needed for splines evaluation (in spaces V0 and V1)
     from numpy import empty
     from numpy import zeros
     from numpy import sqrt
     
-    p1 = p0 - 1
+    p1         = p0 - 1
 
-    l0 = empty(p0,     dtype=float)
-    r0 = empty(p0,     dtype=float)
-    v0 = zeros(p0 + 1, dtype=float)
+    Nl         = empty(p0,     dtype=float)
+    Nr         = empty(p0,     dtype=float)
+    N          = zeros(p0 + 1, dtype=float)
     
-    l1 = empty(p1    , dtype=float)
-    r1 = empty(p1    , dtype=float)
-    v1 = zeros(p1 + 1, dtype=float)
-
-    span_0 = 0
-    span_1 = 0
+    Dl         = empty(p1    , dtype=float)
+    Dr         = empty(p1    , dtype=float)
+    D          = zeros(p1 + 1, dtype=float)
     
-    E   = zeros(3, dtype=float)
-    B   = zeros(3, dtype=float)
+    E          = zeros(3     , dtype=float)
+    B          = zeros(3     , dtype=float)
     
-    e_z = zeros(3, dtype=float)
-    rho = zeros(3, dtype=float)
-    
-    e_z[2] = 1.
-    # ...
+    vec_z      = zeros(3     , dtype=float)
+    rho        = zeros(3     , dtype=float)
+    vec_z[2]   = 1.
     
     
-    # ... define boundary region
-    b_left = p0*delta
-    b_right= L - b_left
-    # ...
+    b_left     = p0*delta
+    b_right    = L - b_left
     
     
-    # ... needed for Boris algorithm
-    qprime = -dt/2
+    qprime     = -dt/2
     
     u_minus    = zeros(3, dtype=float)
     t          = zeros(3, dtype=float)
@@ -308,75 +282,76 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
     S          = zeros(3, dtype=float)
     u_prime_xS = zeros(3, dtype=float)
     u_plus     = zeros(3, dtype=float)
-    # ...
     
-    np = len(particles[:, 0])
+    np         = len(particles[:, 0])
     
     
     #$ omp parallel
-    #$ omp do private ( ip, pos, span_0, l0, r0, v0, span_1, l1, r1, v1, E, B, rho, u_minus, gamma, t, u_minus_xt, u_prime, normB, r, S, u_prime_xS, u_plus, il0, jl0, i0, basis0, il1, jl1, i1, basis1 )
+    #$ omp do private (ip, pos, pos_loc, span0, span1, Nl, Nr, N, Dl, Dr, D, E, B, rho, u_minus, gamma, t, u_minus_xt, u_prime, normB, r, S, u_prime_xS, u_plus, il, jl, i, basis, power)
     for ip in range(np):
+        
         # ... field evaluation (wave + background)
         pos    = particles[ip, 0]
-        span_0 = spans_0[ip]
-        span_1 = span_0 - 1
+        span0  = spans0[ip]
+        span1  = span0 - 1
         
         E[:]   = 0.
         B[:]   = 0.
         B[2]   = 1. + xi*(pos - L/2)**2
         rho[:] = 0.
-        
-        #if (particles[ip, 0] + dt*particles[ip, 3] > L) or (particles[ip, 0] + dt*particles[ip, 3] < 0.):
-            #particles[ip, 3] = -particles[ip, 3]
             
        
         if (pos < b_left) or (pos > b_right):
-            basis_funs(t0, p0, pos, span_0, l0, r0, v0)
-            basis_funs(t1, p1, pos, span_1, l1, r1, v1)
+            basis_funs(t0, p0, pos, span0, Nl, Nr, N)
+            basis_funs(t1, p1, pos, span1, Dl, Dr, D)
 
-            for il0 in range(p0 + 1):
-                i0 = span_0 - il0
+            for il in range(p0 + 1):
+                i = span0 - il
                 
-                basis0 = v0[p0 - il0]
+                basis = N[p0 - il]
                 
-                E[0] += ex[i0]*basis0
-                E[1] += ey[i0]*basis0
+                E[0] += ex[i]*basis
+                E[1] += ey[i]*basis
                 
-            for il1 in range(p1 + 1):
-                i1 = span_1 - il1
+            for il in range(p1 + 1):
+                i = span1 - il
                 
-                basis1 = v1[p1 - il1]*p0/(t1[i1 + p0] - t1[i1])
+                basis = D[p1 - il]*p0/(t1[i + p0] - t1[i])
                 
-                B[0] += bx[i1]*basis1
-                B[1] += by[i1]*basis1       
+                B[0] += bx[i]*basis
+                B[1] += by[i]*basis       
         else:
-            for il0 in range(p0 + 1):
-                i0 = span_0 - il0
+            
+            pos_loc = pos - (span0 - p0)*delta
+            
+            for jl in range(p0 + 1):
+                power = pos_loc**jl
                 
-                for jl0 in range(p0 + 1):
+                for il in range(p0 + 1):
+                    i = span0 - il
+                    basis = pp0[p0 - il, jl]*power
                     
-                    basis0 = pp_0[p0 - il0, jl0]*((pos - (span_0 - p0)*delta))**jl0
+                    E[0] += ex[i]*basis
+                    E[1] += ey[i]*basis
                     
-                    E[0] += ex[i0]*basis0
-                    E[1] += ey[i0]*basis0
-                    
-            for il1 in range(p1 + 1):
-                i1 = span_1 - il1
+            
+            for jl in range(p1 + 1):
+                power = pos_loc**jl
                 
-                for jl1 in range(p1 + 1):
+                for il in range(p1 + 1):
+                    i = span1 - il
+                    basis = pp1[p1 - il, jl]*power
                     
-                    basis1 = pp_1[p1 - il1, jl1]*((pos - (span_1 - p1)*delta))**jl1/delta
-                    
-                    B[0] += bx[i1]*basis1
-                    B[1] += by[i1]*basis1
+                    B[0] += bx[i]*basis
+                    B[1] += by[i]*basis
         
-        cross(particles[ip, 1:4], e_z, rho)
+        
+        cross(particles[ip, 1:4], vec_z, rho)
         B[0] -= rho[0]/B[2]*(pos - L/2)*xi
         B[1] -= rho[1]/B[2]*(pos - L/2)*xi
         # ...
         
-        #print(E)
-        #print(B)
+        
         
         # ... Boris push (relativistic)
         if rel == 1:
@@ -422,3 +397,4 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans_0, L, delta, ex, ey, bx, 
     #$ omp end parallel
         
     ierr = 0
+#==============================================================================
