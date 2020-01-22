@@ -29,6 +29,8 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 #export SLURM_HINT=multithread
 
 # Run the program
+module purge
+
 module load anaconda/3/5.1
 module load gcc/9
 
