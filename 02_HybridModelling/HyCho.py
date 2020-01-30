@@ -30,11 +30,11 @@ print('pyccelization of pic functions done!')
 
 
 #=========================== time integration =======================================
-time_integr = 1                                                 # do time integration? (1 : yes, 0: no)
+time_integr = 0                                                 # do time integration? (1 : yes, 0: no)
 
 #identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55_local'  # name of saved files
 
-identifier = 'test_new'
+identifier  = 'test_new'
 
 dir_results = 'results/'                                        # directory of where to save results
 dir_restart = 'restart_files/'                                  # directory of where to save restart files
@@ -66,24 +66,24 @@ nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2                        # parallel thermal velocity of energetic particles
 wperp = 0.55                       # perpendicular thermal velocity of energetic particles
-xi    = 8.62e-5*0                    # inhomogeneity factor of background magnetic field
+xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
 
 rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
-bc_d  = 0                          # damping of E and j at boundaries? (1: yes, 0: no)
-bc_f  = 0                          # field line dependence of initial distribution function? (1: yes, 0: no)
+bc_d  = 1                          # damping of E and j at boundaries? (1: yes, 0: no)
+bc_f  = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
 #===================================================================================
 
 
 
 #===== numerical parameters =========================================================
-bc      = True                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
+bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
 Lz      = 325.                     # length of z-domain
 Nel     = 5000                     # number of elements z-direction
 T       = 0.4                      # simulation time
 dt      = 0.02                     # time step
 p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(1.3e7)            # number of markers
+Np      = np.int(1.3e6)            # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
 loading = 'importance sampling'    # particle loading 
@@ -354,6 +354,7 @@ elif loading == 'external loading':
 
 elif loading == 'importance sampling':
     particles[:, :4] = np.random.rand(Np, 4)
+    #particles[:, :]  = np.load(name_initial_particles)
     
     Ta               = wperp**2/wpar**2 - 1.
     d_normalization  = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
@@ -365,14 +366,14 @@ elif loading == 'importance sampling':
     # Newton method for particle position (inversion of cumulative distribution function)    
     for ip in range(Np):
     
-        z = Lz/2
-        U = np.random.rand()
+        z_part = Lz/2
+        U = particles[ip, 0]
 
         while True:
-            z = z - F(U, z)/Fprime(z)
+            z_part = z_part - Fz(U, z_part)/Fz_prime(z_part)
 
-            if np.abs(F(U, z)) < 1e-6:
-                particles[ip, 0] = z
+            if np.abs(Fz(U, z_part)) < 1e-6:
+                particles[ip, 0] = z_part
                 break
                 
         if ip%100000 == 0:
