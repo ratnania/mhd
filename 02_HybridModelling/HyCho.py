@@ -86,7 +86,12 @@ p       = 2                        # degree of B-spline basis functions in V0
 Np      = np.int(1.3e7)            # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
-loading = 2                        # particle loading (0: random with seperate generators, 1: random with one generator, 2: loading form a file)
+loading = 'importance sampling'    # particle loading 
+                                   # 'random independently'
+                                   # 'random simultaneously'
+                                   # 'external loading'
+                                   # 'importance sampling'
+                
 name_initial_particles = 'test_particles_Np=1.3e7_1.npy' # name of particle file
 #====================================================================================
 
@@ -175,7 +180,17 @@ def maxwell(z, vx, vy, vz):
 
 
 #===== sampling distribution for initial markers ====================================
-g_sampling = lambda vx, vy, vz : 1/((2*np.pi)**(3/2)*wpar*wperp**2)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))*1/Lz
+def g_sampling(z, vx, vy, vz):
+    
+    xiB = 1. - 1/B_background_z(z)
+    xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
+    
+    if xi == 0:
+        normalization = 1.
+    else:
+        normalization = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
+        
+    return 1/((2*np.pi)**(3/2)*wpar*wperp**2*Lz*normalization)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
 #====================================================================================
 
 
@@ -308,15 +323,15 @@ print('damping assembly done!')
 
 
 #===== create particles (z, vx, vy, vz, wk) and sample according to sampling distribution
-particles       = np.zeros((Np, 5), order='F', dtype=float)
+particles = np.zeros((Np, 5), order='F', dtype=float)
 
-if loading == 0: 
+if   loading == 'random independently': 
     particles[:, 0] = np.random.rand (Np)*Lz
     particles[:, 1] = np.random.randn(Np)*wperp
     particles[:, 2] = np.random.randn(Np)*wperp
     particles[:, 3] = np.random.randn(Np)*wpar
     
-elif loading == 1:
+elif loading == 'random simultaneously':
     particles[:, :4] = np.random.rand(Np, 4)
 
     particles[:, 0]  = particles[:, 0]*Lz
@@ -324,7 +339,7 @@ elif loading == 1:
     particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
     particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
     
-elif loading == 2:
+elif loading == 'external loading':
     particles[:, :] = np.load(name_initial_particles)
 
     #particles[:, 0] = particles[:, 0]*Lz
@@ -336,15 +351,46 @@ elif loading == 2:
     particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
     particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
     particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar *np.sqrt(2)
+
+elif loading == 'importance sampling':
+    particles[:, :4] = np.random.rand(Np, 4)
     
+    Ta               = wperp**2/wpar**2 - 1.
+    d_normalization  = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
+    d_constant       = Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
+    
+    Fz       = lambda U, z : U*d_normalization - z/(Lz*(Ta + 1)) - d_constant - Ta*np.arctan(np.sqrt(xi*(Ta + 1))*(z - Lz/2))/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
+    Fz_prime = lambda z    : -1/(Lz*(Ta + 1)) - Ta/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))*np.sqrt(xi*(Ta + 1))/(1 + xi*(Ta + 1)*(z - Lz/2)**2)
+    
+    # Newton method for particle position (inversion of cumulative distribution function)    
+    for ip in range(Np):
+    
+        z = Lz/2
+        U = np.random.rand()
+
+        while True:
+            z = z - F(U, z)/Fprime(z)
+
+            if np.abs(F(U, z)) < 1e-6:
+                particles[ip, 0] = z
+                break
+                
+        if ip%100000 == 0:
+            print(str(ip) + ' particles loaded!')
+    
+    particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar *np.sqrt(2)         
+    
+print('particle loading done!')    
 spans0[:] = np.floor(particles[:, 0]/dz).astype(int) + p
 #====================================================================================
 
 
 
 #===== parameters for control variate ===============================================
-g0 = g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
-w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 1], particles[:, 2], particles[:, 3])
+g0 = g_sampling(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])
+w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])
 #====================================================================================
 
 
