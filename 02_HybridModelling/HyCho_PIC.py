@@ -4,18 +4,18 @@ from pyccel.decorators import external_call
 
 
 
-#==============================================================================
+# ==============================================================================
 @pure
 @types('double[:]','double[:]','double[:]')
 def cross(a, b, r):
     r[0] = a[1]*b[2] - a[2]*b[1]
     r[1] = a[2]*b[0] - a[0]*b[2]
     r[2] = a[0]*b[1] - a[1]*b[0]
-#==============================================================================
+# ==============================================================================
 
 
 
-#==============================================================================
+# ==============================================================================
 @pure
 @types('double[:]','int','double')
 def find_span(knots, degree, x):
@@ -46,11 +46,11 @@ def find_span(knots, degree, x):
         returnVal = span
 
     return returnVal
-#============================================================================== 
+# ============================================================================== 
 
 
 
-#==============================================================================
+# ==============================================================================
 @types('double[:]','int','double','int','double[:]','double[:]','double[:]')
 def basis_funs(knots, degree, x, span, left, right, values):
     
@@ -69,7 +69,7 @@ def basis_funs(knots, degree, x, span, left, right, values):
             saved     = left[j - r]*temp
         
         values[j + 1] = saved
-#==============================================================================
+# ==============================================================================
 
 
 
@@ -125,11 +125,11 @@ def current(particles_pos, particles_v_w, knots, degree, spans, jh_x, jh_y, n_ba
     jh_y = jh_y/np
     
     ierr = 0
-#==============================================================================
+# ==============================================================================
  
     
     
-#==============================================================================
+# ==============================================================================
 @external_call
 @types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','int','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','int')
 def pusher_periodic(particles, dt, t0, t1, p0, spans0, L, nbase0, ex, ey, bx, by, pp0, pp1, rel):
@@ -232,9 +232,9 @@ def pusher_periodic(particles, dt, t0, t1, p0, spans0, L, nbase0, ex, ey, bx, by
         
     #$ omp end do
     #$ omp end parallel
-        
+    
     ierr = 0
-#==============================================================================
+# ==============================================================================
     
     
     
@@ -242,7 +242,7 @@ def pusher_periodic(particles, dt, t0, t1, p0, spans0, L, nbase0, ex, ey, bx, by
     
     
     
-#==============================================================================
+# ==============================================================================
 @external_call
 @types('double[:,:](order=F)','double','double[:]','double[:]','int','int[:]','double','double','double[:]','double[:]','double[:]','double[:]','double[:,:](order=F)','double[:,:](order=F)','double','int')
 def pusher_reflecting(particles, dt, t0, t1, p0, spans0, L, delta, ex, ey, bx, by, pp0, pp1, xi, rel):
@@ -395,6 +395,45 @@ def pusher_reflecting(particles, dt, t0, t1, p0, spans0, L, delta, ex, ey, bx, b
         
     #$ omp end do
     #$ omp end parallel
-        
+    
     ierr = 0
-#==============================================================================
+# ==============================================================================
+
+
+# ==============================================================================
+@external_call
+@types('double[:,:]','double[:,:](order=F)')
+def set_particles_symmetric(numbers, particles):
+    
+    from numpy import zeros
+    
+    z  = zeros(3, dtype=float)
+    v  = zeros(3, dtype=float)
+    np = len(particles[:, 0])
+    
+    
+    for i_part in range(np):
+        ip = i_part%16
+        
+        if ip == 0:
+            z[0] = numbers[int(i_part/16),   0]
+            v    = numbers[int(i_part/16), 1:4]
+            
+        elif ip%8 == 0:
+            v[2] = 1 - v[2]
+            
+        elif ip%4 == 0:
+            v[1] = 1 - v[1]
+            
+        elif ip%2 == 0:
+            v[0] = 1 - v[0]
+            
+        else:
+            z[0] = 1 - z[0]
+        
+        particles[i_part,   0] = z[0]
+        particles[i_part, 1:4] = v  
+        
+    
+    ierr = 0
+# ==============================================================================

@@ -1,13 +1,15 @@
 import time
 start_simulation = time.time()
 
+import os
+
 import numpy as np
 import scipy as sc
 
 import bsplines  as bsp
 
 import HyCho_FEM as fem
-import HyCho_PIC
+import HyCho_PIC as pic
 
 import matplotlib.pyplot as plt
 
@@ -16,88 +18,83 @@ from scipy.sparse        import block_diag
 from scipy.sparse.linalg import inv
 
 import scipy.special as sp
-
-
-#====================================================================================
-#  calling epyccel
-#====================================================================================
-from pyccel.epyccel import epyccel
-pic = epyccel(HyCho_PIC, accelerator='openmp')
-
-print('pyccelization of pic functions done!')
-#====================================================================================
-
+import sobol_seq     as sobol
 
 
 #=========================== time integration =======================================
-time_integr = 0                                                 # do time integration? (1 : yes, 0: no)
+time_integr = True                  # do time integration? (1 : yes, 0: no)
 
-#identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55_local'  # name of saved files
+# name of output file
+#identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55_local'  
+identifier  = 'test_randomspace_uniformvel_5e5'
 
-identifier  = 'test_new'
-
-dir_results = 'results/'                                        # directory of where to save results
-dir_restart = 'restart_files/'                                  # directory of where to save restart files
+dir_results = 'results/'            # directory of where to save output file
+max_time           = 100*60         # maximum runtime of program in minutes
+time_restart_files = 120*60         # time interval for restart files in minutes
 #====================================================================================
-
 
 
 
 #===== Is this run a restart? (restart = 0: no, restart = 1: yes) ===================
-restart            = 0
+restart        = False
 
-max_time           = 100*60         # maximum runtime of program in minutes
-time_restart_files = 120*60         # time interval for restart files in minutes
+# locate restart files
+name_particles = 'restart_files/' + identifier + '_restart_files/' + identifier + '_restart=particles1.npy'
+name_fields    = 'restart_files/' + identifier + '_restart_files/' + identifier + '_restart=fields1.npy'
+name_time_step = 'restart_files/' + identifier + '_restart_files/' + identifier + '_restart=time1.npy'
+name_control   = 'restart_files/' + identifier + '_restart_files/' + identifier + '_restart=CV1.npy'
 
-# names of restart files
-name_particles     = 'restart_files/' + identifier + '_restart=particles1.npy'
-name_fields        = 'restart_files/' + identifier + '_restart=fields1.npy'
-name_time_step     = 'restart_files/' + identifier + '_restart=time1.npy'
-name_control       = 'restart_files/' + identifier + '_restart=CV1.npy'
+# create restart files at end of simulation?
+create_restart = False
+dir_restart    = '/home/florian/Desktop/Masterarbeit/06_Github/mhd/02_HybridModelling/restart_files/' + identifier + '_restart_files/'
 #====================================================================================
 
 
 
-
-
 #===== physical parameters ==========================================================
-wpe   = 5.                         # cold electron plasma frequency
-nuh   = 6e-3                       # ratio of cold/hot electron densities (nh/nc)
+wpe   = 2.                         # cold electron plasma frequency
+nuh   = 6e-2                       # ratio of cold/hot electron densities (nh/nc)
 nh    = nuh*wpe**2                 # hot electron density
 wpar  = 0.2                        # parallel thermal velocity of energetic particles
-wperp = 0.55                       # perpendicular thermal velocity of energetic particles
-xi    = 8.62e-5                    # inhomogeneity factor of background magnetic field
+wperp = 0.53                       # perpendicular thermal velocity of energetic particles
+xi    = 0.                         # inhomogeneity factor of background magnetic field
 
-rel   = 1                          # relativistic fast electrons? (1: yes, 0: no)
-bc_d  = 1                          # damping of E and j at boundaries? (1: yes, 0: no)
-bc_f  = 1                          # field line dependence of initial distribution function? (1: yes, 0: no)
+rel   = 0                          # relativistic fast electrons? (1: yes, 0: no)
+bc_d  = 0                          # damping of E and j at boundaries? (1: yes, 0: no)
+bc_f  = 0                          # field line dependence of initial distribution function? (1: yes, 0: no)
 #===================================================================================
 
 
 
 #===== numerical parameters =========================================================
-bc      = False                    # boundary conditions (True: periodic, False: homogeneous Dirichlet)
+bc      = True                     # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
-Lz      = 325.                     # length of z-domain
-Nel     = 5000                     # number of elements z-direction
-T       = 0.4                      # simulation time
-dt      = 0.02                     # time step
-p       = 2                        # degree of B-spline basis functions in V0
-Np      = np.int(1.3e6)            # number of markers
+Lz      = 2*np.pi/k                # length of z-domain
+Nel     = 32                       # number of elements z-direction
+T       = 200.                     # simulation time
+dt      = 0.05                     # time step
+p       = 3                        # degree of B-spline basis functions in V0
+Np      = np.int(5e5)              # number of markers
 control = 0                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
-loading = 'importance sampling'    # particle loading 
-                                   # 'random independently'
-                                   # 'random simultaneously'
-                                   # 'external loading'
-                                   # 'importance sampling'
+loading = 'pr_space_uniform_vel'   # particle loading: 
+                                   # 1: 'pseudo-random'         --> np.random.rand(Np, 4)
+                                   # 2: 'external loading'      --> numbers between (0, 1) from an external file (shape(Np, 5))
+                                   # 3: 'sobol_plain'           --> sobol.i4_sobol_generate(4, Np, skip=1000)
+                                   # 4: 'sobol_antithetic16'    --> sobol.i4_sobol_generate(4, int(Np/16), skip=1000)
+                                   # 5: 'pr_space_uni_velocity' --> pseudo-random in space, uniform in velocity space
+                                   # 6: 'importance sampling'
+                                   
                 
-name_initial_particles = 'test_particles_Np=1.3e7_1.npy' # name of particle file
+# name of particle file for external loading                            
+name_initial_particles = 'test_particles_Np=1.3e7_1.npy' 
 #====================================================================================
 
 
 #===== evaluation points for the magnetic field======================================
-eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
+#eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
+eva_points_Bx = np.array([np.pi/4, np.pi/2, 3*np.pi/4])
+#eva_points_Bx = np.linspace(0., Lz, Nel + 1)
 #====================================================================================
 
 
@@ -120,8 +117,8 @@ def Bx0(z):
 '''
 
 
-Bx0 = lambda z : 0*z               # initial Bx
-#Bx0 = lambda z : amp*np.sin(k*z)
+#Bx0 = lambda z : 0*z               # initial Bx
+Bx0 = lambda z : amp*np.sin(k*z)
 
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
@@ -324,37 +321,61 @@ print('damping assembly done!')
 
 #===== create particles (z, vx, vy, vz, wk) and sample according to sampling distribution
 particles = np.zeros((Np, 5), order='F', dtype=float)
-
-if   loading == 'random independently': 
-    particles[:, 0] = np.random.rand (Np)*Lz
-    particles[:, 1] = np.random.randn(Np)*wperp
-    particles[:, 2] = np.random.randn(Np)*wperp
-    particles[:, 3] = np.random.randn(Np)*wpar
     
-elif loading == 'random simultaneously':
+if loading == 'pseudo-random':
     particles[:, :4] = np.random.rand(Np, 4)
 
+    # inversion of cumulative distribution function 
+    particles[:,  0] = particles[:, 0]*Lz
+    particles[:,  1] = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:,  2] = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:,  3] = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
+    
+elif loading == 'external loading':
+    particles[:, :]  = np.load(name_initial_particles)
+
+    # inversion of cumulative distribution function
     particles[:, 0]  = particles[:, 0]*Lz
     particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
     particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
     particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
     
-elif loading == 'external loading':
-    particles[:, :] = np.load(name_initial_particles)
-
-    #particles[:, 0] = particles[:, 0]*Lz
-    #particles[:, 1] = particles[:, 1]*wperp
-    #particles[:, 2] = particles[:, 2]*wperp
-    #particles[:, 3] = particles[:, 3]*wpar
-
-    particles[:, 0]  = particles[:, 0]*Lz
-    particles[:, 1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
-    particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
-    particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar *np.sqrt(2)
+elif loading == 'sobol_plain':
+    particles[:, :4] = sobol.i4_sobol_generate(4, Np, 1000)
+    
+    # inversion of cumulative distribution function
+    particles[:,  0] = particles[:, 0]*Lz
+    particles[:,  1] = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:,  2] = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:,  3] = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
+    
+elif loading == 'sobol_antithetic16':
+    pic.set_particles(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
+    
+    # inversion of cumulative distribution function
+    particles[:,  0]  = particles[:, 0]*Lz
+    particles[:,  1]  = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:,  2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:,  3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
+    
+elif loading == 'pr_space_uni_velocity':
+    particles[:,  0]  = np.random.rand(Np)
+    
+    dv = 1/Np
+    particles[:,  1]  = np.linspace(dv, 1 - dv, Np)
+    particles[:,  2]  = np.linspace(dv, 1 - dv, Np)
+    particles[:,  3]  = np.linspace(dv, 1 - dv, Np)
+    
+    # inversion of cumulative distribution function
+    particles[:, 0] = particles[:, 0]*Lz
+    particles[:, 1] = sp.erfinv(2*particles[:, 1] - 1)*wperp*np.sqrt(2)
+    particles[:, 2] = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
+    particles[:, 3] = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
 
 elif loading == 'importance sampling':
-    particles[:, :4] = np.random.rand(Np, 4)
-    #particles[:, :]  = np.load(name_initial_particles)
+    #particles[:, :4] = np.random.rand(Np, 4)
+    #particles[:, :4] = sobol.i4_sobol_generate(4, Np, 1000)
+    pic.set_particles(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
     
     Ta               = wperp**2/wpar**2 - 1.
     d_normalization  = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
@@ -367,7 +388,7 @@ elif loading == 'importance sampling':
     for ip in range(Np):
     
         z_part = Lz/2
-        U = particles[ip, 0]
+        U      = particles[ip, 0]
 
         while True:
             z_part = z_part - Fz(U, z_part)/Fz_prime(z_part)
@@ -383,15 +404,15 @@ elif loading == 'importance sampling':
     particles[:, 2]  = sp.erfinv(2*particles[:, 2] - 1)*wperp*np.sqrt(2)
     particles[:, 3]  = sp.erfinv(2*particles[:, 3] - 1)*wpar *np.sqrt(2)         
     
-print('particle loading done!')    
 spans0[:] = np.floor(particles[:, 0]/dz).astype(int) + p
+print('particle loading done!')
 #====================================================================================
 
 
 
 #===== parameters for control variate ===============================================
 g0 = g_sampling(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])
-w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g_sampling(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])
+w0 = fh0(particles[:, 0], particles[:, 1], particles[:, 2], particles[:, 3])/g0
 #====================================================================================
 
 
@@ -524,9 +545,9 @@ def update():
 
 
 #============================ time loop =============================================
-if time_integr == 1:
+if time_integr:
     
-    if restart == 0:
+    if restart == False:
         title = dir_results + identifier + '.txt'
         file = open(title, 'ab')
         
@@ -557,12 +578,11 @@ if time_integr == 1:
         #en_Bx = 1/2 * bx.dot(M1.dot(bx))
         
         data = np.concatenate((Bx, energies, np.array([0.])))
-        np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+        np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.12e')
         
         #data = np.concatenate((bx, energies, np.array([0.])))
         #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
         #=============================================================================
-        
         
         
         time_step = 0
@@ -573,10 +593,10 @@ if time_integr == 1:
         title = dir_results + identifier + '.txt'
         file = open(title, 'ab')
 
-        particles[:] = np.load(name_particles)
-        uj[:]        = np.load(name_fields)
-        w0           = np.load(name_control)[0]
-        g0           = np.load(name_control)[1]
+        particles[:]       = np.load(name_particles)
+        uj[:]              = np.load(name_fields)
+        w0                 = np.load(name_control)[0]
+        g0                 = np.load(name_control)[1]
         time_step, counter = np.load(name_time_step)
 
         if bc == True:
@@ -605,13 +625,18 @@ if time_integr == 1:
 
         try:
             if (time_step*dt >= T) or ((time.time() - start_simulation)/60 > max_time):
+                
+                if create_restart:
+                    
+                    if not os.path.exists(dir_restart):
+                        os.makedirs(dir_restart)
 
-                counter += 1
+                    counter += 1
 
-                np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
-                np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
-                np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
-                np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
+                    np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                    np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                    np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                    np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
 
                 break
 
@@ -621,14 +646,19 @@ if time_integr == 1:
 
             if (time.time() - last_time)/60 > time_restart_files:
                 
-                counter += 1
+                if create_restart:
+                    
+                    if not os.path.exists(dir_restart):
+                        os.makedirs(dir_restart)
 
-                np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
-                np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
-                np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
-                np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
+                    counter += 1
 
-                last_time = time.time()
+                    np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                    np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                    np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                    np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
+
+                    last_time = time.time()
 
 
                 
@@ -639,14 +669,13 @@ if time_integr == 1:
             #en_Bx = 1/2 * bx.dot(M1.dot(bx))
         
             data = np.concatenate((Bx, energies, np.array([(time_step + 1)*dt])))
-            np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.10e')
+            np.savetxt(file, np.reshape(data, (1, 5 + len(eva_points_Bx))), fmt = '%1.12e')
             
             
             #data = np.concatenate((bx, energies, np.array([(time_step + 1)*dt])))
             #np.savetxt(file, np.reshape(data, (1, 5 + len(bx))), fmt = '%1.10e')
             #=========================================================================
 
-            
             
             time_step += 1
 
@@ -659,12 +688,17 @@ if time_integr == 1:
                 response = input()
                 if response == 'quit':
                     
-                    counter += 1
+                    if create_restart:
+                    
+                        if not os.path.exists(dir_restart):
+                            os.makedirs(dir_restart)
 
-                    np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
-                    np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
-                    np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
-                    np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
+                        counter += 1
+
+                        np.save(dir_restart + identifier + '_restart=particles' + str(counter), particles)
+                        np.save(dir_restart + identifier + '_restart=CV'        + str(counter), np.vstack((w0, g0)))
+                        np.save(dir_restart + identifier + '_restart=fields'    + str(counter), uj)
+                        np.save(dir_restart + identifier + '_restart=time'      + str(counter), np.array([time_step, counter]))
                     
                     break
 
