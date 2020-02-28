@@ -350,7 +350,7 @@ elif loading == 'sobol_plain':
     particles[:,  3] = sp.erfinv(2*particles[:, 3] - 1)*wpar*np.sqrt(2)
     
 elif loading == 'sobol_antithetic16':
-    pic.set_particles(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
+    pic.set_particles_symmetric(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
     
     # inversion of cumulative distribution function
     particles[:,  0]  = particles[:, 0]*Lz
@@ -375,7 +375,7 @@ elif loading == 'pr_space_uni_velocity':
 elif loading == 'importance sampling':
     #particles[:, :4] = np.random.rand(Np, 4)
     #particles[:, :4] = sobol.i4_sobol_generate(4, Np, 1000)
-    pic.set_particles(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
+    pic.set_particles_symmetric(sobol.i4_sobol_generate(4, int(Np/16), 1000), particles)
     
     Ta               = wperp**2/wpar**2 - 1.
     d_normalization  = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
