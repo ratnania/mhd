@@ -25,11 +25,11 @@ import sobol_seq     as sobol
 time_integr = True                  # do time integration? (1 : yes, 0: no)
 
 # name of output file
-#identifier  = 'run_L=327.7_Nel=3400_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=none_p=2_CV=off_amp=none_rel=on_wperp=0.55_local'  
-identifier  = 'test_randomspace_uniformvel_5e5'
+#identifier  = 'run_L=327.7_Nel=3200_T=5000_dt=0.02_Np=1.5e7_nuh=6e-3_xi=8.62e-5_bc=False_k=no_p=3_CV=off_amp=no_rel=on_wperp=0.55_1'  
+identifier  = 'test'
 
 dir_results = 'results/'            # directory of where to save output file
-max_time           = 100*60         # maximum runtime of program in minutes
+max_time           = 23.5*60        # maximum runtime of program in minutes
 time_restart_files = 120*60         # time interval for restart files in minutes
 #====================================================================================
 
@@ -69,15 +69,15 @@ bc_f  = 0                          # field line dependence of initial distributi
 #===== numerical parameters =========================================================
 bc      = True                     # boundary conditions (True: periodic, False: homogeneous Dirichlet)
 k       = 2.                       # wavenumber of initial wave field perturbations
-Lz      = 2*np.pi/k                # length of z-domain
-Nel     = 32                       # number of elements z-direction
+Lz      = 80.                      # length of z-domain
+Nel     = 256                      # number of elements z-direction
 T       = 200.                     # simulation time
 dt      = 0.05                     # time step
 p       = 3                        # degree of B-spline basis functions in V0
 Np      = np.int(5e5)              # number of markers
-control = 0                        # control variate for noise reduction? (1: yes, 0: no)
+control = 1                        # control variate for noise reduction? (1: yes, 0: no)
 Ld      = 0.046*Lz                 # length of damping region at each end
-loading = 'pr_space_uniform_vel'   # particle loading: 
+loading = 'pseudo-random'          # particle loading: 
                                    # 1: 'pseudo-random'         --> np.random.rand(Np, 4)
                                    # 2: 'external loading'      --> numbers between (0, 1) from an external file (shape(Np, 5))
                                    # 3: 'sobol_plain'           --> sobol.i4_sobol_generate(4, Np, skip=1000)
@@ -91,7 +91,7 @@ name_initial_particles = 'test_particles_Np=1.3e7_1.npy'
 #====================================================================================
 
 
-#===== evaluation points for the magnetic field======================================
+#===== evaluation points for the magnetic field =====================================
 #eva_points_Bx = np.array([100., 120., 140., 160., 180., 200.])
 eva_points_Bx = np.array([np.pi/4, np.pi/2, 3*np.pi/4])
 #eva_points_Bx = np.linspace(0., Lz, Nel + 1)
@@ -117,8 +117,8 @@ def Bx0(z):
 '''
 
 
-#Bx0 = lambda z : 0*z               # initial Bx
-Bx0 = lambda z : amp*np.sin(k*z)
+Bx0 = lambda z : 0*z               # initial Bx
+#Bx0 = lambda z : amp*np.sin(2*z) + amp*np.sin(1.5*z) 
 
 By0 = lambda z : 0*z               # initial By
 jx0 = lambda z : 0*z               # initial jcx
@@ -179,15 +179,17 @@ def maxwell(z, vx, vy, vz):
 #===== sampling distribution for initial markers ====================================
 def g_sampling(z, vx, vy, vz):
     
-    xiB = 1. - 1/B_background_z(z)
-    xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
+    if loading == 'importance sampling':
     
-    if xi == 0:
-        normalization = 1.
-    else:
+        xiB = 1. - 1/B_background_z(z)
+        xiz = 1. + (wperp**2/wpar**2 - 1.)*xiB*bc_f
+        
         normalization = 1/(Ta + 1) + 2*Ta*np.arctan(np.sqrt(xi*(Ta + 1))*Lz/2)/(Lz*np.sqrt(xi)*(Ta + 1)**(3/2))
         
-    return 1/((2*np.pi)**(3/2)*wpar*wperp**2*Lz*normalization)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
+        return 1/((2*np.pi)**(3/2)*wpar*wperp**2*Lz*normalization)*np.exp(-vz**2/(2*wpar**2) - xiz*(vx**2 + vy**2)/(2*wperp**2))
+    
+    else:    
+        return 1/((2*np.pi)**(3/2)*wpar*wperp**2*Lz)*np.exp(-vz**2/(2*wpar**2) - (vx**2 + vy**2)/(2*wperp**2))
 #====================================================================================
 
 
